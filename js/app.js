@@ -17,17 +17,30 @@ function obtenerFechaLocal() {
 
 async function verificarSesion() {
     const { data: { session } } = await clienteSupabase.auth.getSession();
+    
     if (!session) {
         window.location.href = 'login.html';
         return;
     }
+
+    // NUEVO: Verificar Rol para redirigir a Admin si corresponde
+    const userId = session.user.id;
+    const { data: perfil, error } = await clienteSupabase
+        .from('perfiles')
+        .select('rol')
+        .eq('id', userId)
+        .single();
+
+    if (perfil && perfil.rol === 'entrenador') {
+        // Si soy entrenador y entré por error a la App del cliente,
+        // me manda automáticamente al Admin Panel.
+        window.location.href = 'admin.html';
+        return;
+    }
+
+    // Si soy cliente, cargo la rutina normal
     cargarRutinaActiva();
 }
-
-document.getElementById('btn-logout').addEventListener('click', async () => {
-    await clienteSupabase.auth.signOut();
-    window.location.href = 'login.html';
-});
 
 // ==========================================
 //      2. LÓGICA DE NAVEGACIÓN
