@@ -1,0 +1,155 @@
+/* css/admin.css */
+
+body {
+    background-color: #0d0f12; /* Fondo muy oscuro, casi negro */
+    overflow-x: hidden; /* Evitar scroll horizontal */
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* --- SIDEBAR --- */
+.sidebar {
+    width: 260px; /* Ancho fijo */
+    height: 100vh; /* Altura completa de pantalla */
+    position: fixed; /* Se queda quieto al hacer scroll */
+    top: 0;
+    left: 0;
+    background-color: #16191d; /* Un poco más claro que el fondo */
+    border-right: 1px solid #2c3035;
+    z-index: 1000;
+}
+
+/* Links del menú */
+.nav-pills .nav-link {
+    border-radius: 6px;
+    margin-bottom: 5px;
+    padding: 10px 15px;
+    transition: all 0.2s;
+}
+
+/* Efecto hover en items no activos */
+.nav-pills .nav-link:not(.active):hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #fff !important;
+}
+
+/* --- CONTENIDO PRINCIPAL --- */
+.content-wrapper {
+    margin-left: 260px; /* Dejamos espacio para el sidebar */
+    width: calc(100% - 260px);
+    min-height: 100vh;
+}
+
+/* --- TABLAS --- */
+.table-dark {
+    --bs-table-bg: #1e2227;
+    --bs-table-striped-bg: #252a30;
+}
+
+.table th {
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #343a40;
+}
+
+.thumb-ejercicio {
+    width: 45px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: 8px;
+    background-color: #000;
+    border: 1px solid #343a40;
+}
+
+/* --- MODALES Y FORMS --- */
+.modal-content {
+    background-color: #16191d;
+}
+
+.form-control:focus, .form-select:focus {
+    box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.15); /* Sombra amarilla sutil */
+    border-color: #ffc107;
+}
+
+/* --- SCROLLBAR PERSONALIZADO (Chrome/Safari) --- */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0d0f12; 
+}
+::-webkit-scrollbar-thumb {
+    background: #343a40; 
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #495057; 
+}
+/* Estilos para el Constructor */
+
+/* Item del catálogo (Izquierda) */
+.item-catalogo {
+    cursor: pointer;
+    transition: all 0.2s;
+    background-color: #1e2126;
+    border: 1px solid #343a40;
+}
+.item-catalogo:hover {
+    background-color: #2c3035;
+    border-color: #ffc107;
+}
+
+/* Item de la rutina (Derecha) */
+.item-rutina {
+    background-color: #16191d;
+    border-left: 4px solid #ffc107; /* Borde amarillo para destacar */
+}
+
+/* Inputs compactos dentro de la tarjeta de rutina */
+.input-compacto {
+    background-color: #000;
+    border: 1px solid #343a40;
+    color: white;
+    font-size: 0.9rem;
+    padding: 4px 8px;
+}
+
+/* =============================================
+   ESTILOS DE PREVISUALIZACIÓN (Modo Cliente)
+   ============================================= */
+
+/* Copia exacta de las tarjetas del cliente */
+.card-preview {
+    background-color: #1e2126;
+    border: 1px solid #2c3035;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.badge-preview {
+    background-color: #ffc107;
+    color: #000;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.fila-serie-preview {
+    border-bottom: 1px solid #363a40;
+    padding: 10px 0;
+    font-size: 0.9rem;
+}
+.fila-serie-preview:last-child {
+    border-bottom: none;
+}
+
+/* Input falso (deshabilitado para el preview) */
+.input-fake {
+    background-color: #000;
+    border: 1px solid #495057;
+    color: #777;
+    text-align: center;
+    width: 60px;
+    display: inline-block;
+    padding: 2px;
+    border-radius: 4px;
+}

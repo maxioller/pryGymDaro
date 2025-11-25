@@ -1,0 +1,49 @@
+/* css/login.css */
+
+body {
+    background-color: #121418; /* Fondo oscuro global */
+    height: 100vh; /* Ocupa toda la altura de la pantalla */
+    display: flex; /* Flexbox para centrar todo */
+    align-items: center; /* Centrado vertical */
+    justify-content: center; /* Centrado horizontal */
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.card-login {
+    background-color: #1e2126; /* Un tono más claro que el fondo */
+    border: 1px solid #2c3035;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); /* Sombra suave */
+    max-width: 400px;
+    width: 100%;
+    padding: 2rem;
+}
+
+/* Botón amarillo personalizado */
+.btn-ingresar {
+    background-color: #ffc107;
+    color: #000;
+    font-weight: bold;
+    border: none;
+    transition: all 0.3s ease; /* Animación suave al pasar el mouse */
+}
+
+.btn-ingresar:hover {
+    background-color: #e0a800; /* Se oscurece un poco al hover */
+    transform: scale(1.02); /* Crece un poquito */
+}
+
+/* Inputs oscuros */
+.form-control {
+    background-color: #2b3035;
+    border: 1px solid #495057;
+    color: white;
+}
+
+/* Al hacer clic en el input */
+.form-control:focus {
+    background-color: #2b3035;
+    border-color: #ffc107; /* Borde amarillo al escribir */
+    color: white;
+    box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25); /* Resplandor amarillo */
+}

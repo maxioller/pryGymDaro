@@ -1,0 +1,71 @@
+/* css/app.css */
+
+body {
+    background-color: #121418; /* Mismo fondo que el login */
+    color: #f8f9fa; /* Texto claro por defecto */
+}
+
+/* Estilo de la Tarjeta del Ejercicio */
+.card-ejercicio {
+    background-color: #1e2126;
+    border: 1px solid #2c3035;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+/* Badge amarillo (#1, #2...) */
+.badge-numero {
+    background-color: #ffc107;
+    color: #000;
+    font-weight: bold;
+    font-size: 1.1em;
+    padding: 5px 10px;
+    border-radius: 8px;
+}
+
+/* Líneas divisorias entre series */
+.fila-serie {
+    border-bottom: 1px solid #363a40;
+    padding: 12px 0;
+}
+
+/* Quitamos la línea en la última serie para que se vea limpio */
+.fila-serie:last-child {
+    border-bottom: none;
+}
+
+/* Input pequeño para el peso */
+.input-peso {
+    background-color: #2b3035;
+    border: 1px solid #495057;
+    color: white;
+    text-align: center; /* Números centrados */
+    font-weight: bold;
+}
+
+.input-peso:focus {
+    background-color: #343a40;
+    border-color: #ffc107;
+    color: white;
+    box-shadow: none; /* Quitamos el brillo azul de Bootstrap */
+}
+
+/* Checkbox personalizado */
+.form-check-input {
+    background-color: #2b3035;
+    border-color: #495057;
+    cursor: pointer;
+}
+
+.form-check-input:checked {
+    background-color: #198754; /* Verde éxito al marcar */
+    border-color: #198754;
+}
+
+/* Truco CSS para quitar las flechas arriba/abajo en los inputs de número */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
