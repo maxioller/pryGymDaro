@@ -114,3 +114,21 @@ formulario.addEventListener('submit', async (e) => {
         btnSpinner.classList.add('d-none');
     }
 });
+
+// Función para iniciar sesión con Google
+async function loginConGoogle() {
+    const { data, error } = await clienteSupabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            // Redirige a la página de inicio tras el login exitoso
+            // Como usas Live Server, esto debería funcionar automático,
+            // pero si falla, Google te devolverá a la URL que configuraste.
+            redirectTo: window.location.origin + '/app.html' 
+        }
+    });
+
+    if (error) {
+        console.error("Error Google:", error);
+        alert("No se pudo iniciar con Google");
+    }
+}
