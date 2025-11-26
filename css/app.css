@@ -1,11 +1,37 @@
-/* css/app.css */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+/* =========================================
+   1. ESTRUCTURA GENERAL
+   ========================================= */
 
 body {
-    background-color: #121418; /* Mismo fondo que el login */
-    color: #f8f9fa; /* Texto claro por defecto */
+    background-color: #121418; /* Fondo oscuro */
+    color: #f8f9fa; /* Texto claro */
+    /* Espacio inferior crítico para que el menú y el timer no tapen el contenido */
+    padding-bottom: 150px !important; 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* Estilo de la Tarjeta del Ejercicio */
+/* =========================================
+   2. ENCABEZADO (HEADER SUPERIOR)
+   ========================================= */
+
+.navbar-top-custom {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    gap: 5px;
+    background-color: #000000 !important; /* Negro puro para el header */
+    z-index: 1030; /* Por encima del contenido */
+}
+
+/* =========================================
+   3. TARJETAS DE EJERCICIO
+   ========================================= */
+
 .card-ejercicio {
     background-color: #1e2126;
     border: 1px solid #2c3035;
@@ -14,7 +40,6 @@ body {
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
-/* Badge amarillo (#1, #2...) */
 .badge-numero {
     background-color: #ffc107;
     color: #000;
@@ -24,23 +49,21 @@ body {
     border-radius: 8px;
 }
 
-/* Líneas divisorias entre series */
 .fila-serie {
     border-bottom: 1px solid #363a40;
     padding: 12px 0;
 }
 
-/* Quitamos la línea en la última serie para que se vea limpio */
 .fila-serie:last-child {
     border-bottom: none;
 }
 
-/* Input pequeño para el peso */
+/* Input de peso */
 .input-peso {
     background-color: #2b3035;
     border: 1px solid #495057;
     color: white;
-    text-align: center; /* Números centrados */
+    text-align: center;
     font-weight: bold;
 }
 
@@ -48,7 +71,7 @@ body {
     background-color: #343a40;
     border-color: #ffc107;
     color: white;
-    box-shadow: none; /* Quitamos el brillo azul de Bootstrap */
+    box-shadow: none;
 }
 
 /* Checkbox personalizado */
@@ -56,16 +79,112 @@ body {
     background-color: #2b3035;
     border-color: #495057;
     cursor: pointer;
+    width: 28px;
+    height: 28px;
 }
 
 .form-check-input:checked {
-    background-color: #198754; /* Verde éxito al marcar */
+    background-color: #198754; /* Verde éxito */
     border-color: #198754;
 }
 
-/* Truco CSS para quitar las flechas arriba/abajo en los inputs de número */
+/* Quitar flechas de input number */
 input[type=number]::-webkit-inner-spin-button, 
 input[type=number]::-webkit-outer-spin-button { 
   -webkit-appearance: none; 
   margin: 0; 
+}
+
+/* =========================================
+   4. CRONÓMETRO MEJORADO (ESTILO NEÓN)
+   ========================================= */
+
+.timer-docked {
+    position: fixed;
+    bottom: 70px; /* Un poco más arriba para separarlo del menú */
+    left: 50%; /* Centrado absoluto */
+    transform: translateX(-50%); /* Corrección del centrado */
+    
+    width: 95%; /* No ocupa todo el ancho, se ve como una "isla" flotante */
+    max-width: 400px; /* Tope para pantallas grandes */
+    
+    background-color: rgba(13, 15, 18, 0.95); /* Fondo casi negro */
+    backdrop-filter: blur(10px); /* Efecto vidrio borroso */
+    
+    border: 1px solid #333;
+    border-radius: 100px; /* Bordes totalmente redondos (Píldora) */
+    z-index: 1020;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.5); /* Sombra profunda */
+    
+    /* Flexbox para centrar todo el contenido interno */
+    display: flex;
+    justify-content: space-between; /* Espacio entre reloj y botones */
+    align-items: center;
+    padding: 8px 25px; /* Espacio interno */
+}
+
+/* Estilo de los Números */
+#timer-display {
+    font-family: 'Share Tech Mono', monospace; /* La fuente digital */
+    font-size: 2.2rem; /* Números grandes */
+    color: #ffc107; /* Amarillo */
+    line-height: 1;
+    text-shadow: 0 0 10px rgba(255, 193, 7, 0.4); /* Efecto Neón suave */
+    min-width: 110px; /* Para que no baile cuando cambian los números */
+    text-align: center;
+}
+
+/* Icono del relojito pequeño */
+.timer-icon {
+    color: #6c757d;
+    font-size: 1.2rem;
+    margin-right: 10px;
+}
+
+/* =========================================
+   5. MENÚ INFERIOR (BOTTOM NAV)
+   ========================================= */
+
+/* Estilos del contenedor del menú */
+.navbar.fixed-bottom {
+    background-color: #000000 !important;
+    border-top: 1px solid #333;
+    height: 65px; /* Altura fija */
+    z-index: 1030;
+}
+
+/* Botones del menú */
+.nav-item-bottom {
+    background: transparent;
+    border: none;
+    color: #6c757d !important; /* Gris inactivo */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex: 1; /* Ocupan el mismo ancho */
+    transition: color 0.2s ease;
+}
+
+/* Iconos del menú */
+.nav-item-bottom i {
+    font-size: 1.4rem;
+    margin-bottom: 2px;
+    display: block;
+}
+
+/* Texto del menú */
+.nav-item-bottom span {
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+/* Estado ACTIVO (Seleccionado) */
+.nav-item-bottom.active {
+    color: #ffc107 !important; /* Amarillo activo */
+}
+
+.nav-item-bottom:hover {
+    color: #ffc107 !important; /* Gris claro al hover */
 }
