@@ -275,10 +275,10 @@ async function cargarEjerciciosDelDia(diaId) {
 
 function renderizarTarjetas(datosRutina, datosHistorial) {
     const contenedor = document.getElementById('contenedor-rutina');
-    contenedor.innerHTML = "";
+    contenedor.innerHTML = ""; 
 
     if (!datosRutina || datosRutina.length === 0) {
-        contenedor.innerHTML = `<div class="alert alert-info text-center opacity-75 mt-5">Descanso o sin ejercicios.</div>`;
+        contenedor.innerHTML = `<div class="alert alert-info text-center opacity-75 mt-5">Descanso o sin ejercicios asignados.</div>`;
         return;
     }
 
@@ -290,17 +290,16 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
         const pesoPrevio = datoGuardado ? datoGuardado.peso_real : '';
         const estaCompletado = datoGuardado && datoGuardado.completado ? 'checked' : '';
 
+        // --- HEADER TARJETA ---
         const esNuevaTarjeta = fila.orden_ejercicio !== tarjetaActualIdx;
         const nombreEjercicio = fila.ejercicios_catalogo?.nombre || "Ejercicio";
 
         if (esNuevaTarjeta) {
-            if (tarjetaActualIdx !== null) html += `</div></div>`;
+            if (tarjetaActualIdx !== null) html += `</div></div>`; 
             tarjetaActualIdx = fila.orden_ejercicio;
 
-            const htmlNotaGeneral = fila.nota_ejercicio
-        ? `<div class="alert alert-dark border-warning text-warning small mb-3 p-2">
-                <i class="bi bi-info-circle-fill text-warning me-2"></i>${fila.nota_ejercicio}
-           </div>` : '';
+            const htmlNotaGeneral = fila.nota_ejercicio 
+                ? `<div class="alert alert-dark border-warning text-warning small mb-3 p-2"><i class="bi bi-info-circle-fill me-2"></i>${fila.nota_ejercicio}</div>` : '';
 
             const urlImagen = fila.ejercicios_catalogo?.imagen_url;
             const htmlImagen = urlImagen
@@ -309,9 +308,11 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
             html += `
                 <div class="card card-ejercicio p-3 animate__animated animate__fadeIn">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h4 class="m-0 text-white" style="max-width: 75%;">${nombreEjercicio}</h4>
+                        <h4 class="m-0 text-white" style="max-width: 70%;">${nombreEjercicio}</h4>
+                        
                         <div class="d-flex align-items-center gap-2">
-                            <button class="btn btn-sm btn-dark border-secondary text-warning" onclick="abrirGrafico(${fila.ejercicio_id}, '${nombreEjercicio}')">
+                            <button class="btn btn-sm btn-dark border-secondary text-warning" 
+                                    onclick="abrirGrafico(${fila.ejercicio_id}, '${nombreEjercicio}')">
                                 <i class="bi bi-graph-up"></i>
                             </button>
                             <span class="badge-numero">#${fila.orden_ejercicio}</span>
@@ -323,15 +324,17 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
             `;
         }
 
-        const badgeClass = fila.tipo_serie === 'calentamiento' ? 'bg-secondary' : 'bg-success';
+        // --- FILA SERIE ---
+        const esCalentamiento = fila.tipo_serie === 'calentamiento';
+        const badgeColor = esCalentamiento ? 'bg-secondary' : 'bg-success';
         const textoSerie = fila.tipo_serie ? fila.tipo_serie.toUpperCase() : 'TRABAJO';
-        const htmlObservacionFila = fila.observaciones
+        const htmlObservacionFila = fila.observaciones 
             ? `<div class="text-secondary small fst-italic my-1"><i class="bi bi-caret-right-fill"></i> ${fila.observaciones}</div>` : '';
 
         html += `
             <div class="row fila-serie align-items-center">
                 <div class="col-5">
-                    <span class="badge ${badgeClass} mb-1" style="font-size: 0.65em;">${textoSerie}</span>
+                    <span class="badge ${badgeColor} mb-1" style="font-size: 0.65em;">${textoSerie}</span>
                     <div class="fw-bold fs-5">${fila.reps_objetivo} <span class="fs-6 fw-normal text-muted">reps</span></div>
                     ${htmlObservacionFila}
                 </div>
