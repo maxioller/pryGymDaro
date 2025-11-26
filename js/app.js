@@ -6,9 +6,10 @@
 function obtenerFechaLocal() {
     const ahora = new Date();
     const anio = ahora.getFullYear();
+    // Los meses van de 0 a 11, por eso sumamos 1
     const mes = String(ahora.getMonth() + 1).padStart(2, '0');
     const dia = String(ahora.getDate()).padStart(2, '0');
-    return `${anio}-${mes}-${dia}`;
+    return `${anio}-${mes}-${dia}`; // Retorna "2025-11-25" (texto plano)
 }
 
 
@@ -24,7 +25,7 @@ function cambiarTab(tabName) {
 
     // 2. Mostrar seleccionada
     const view = document.getElementById(`view-${tabName}`);
-    if (view) view.classList.remove('d-none');
+    if(view) view.classList.remove('d-none');
 
     // 3. Actualizar botones inferiores
     const botones = document.querySelectorAll('.nav-item-bottom');
@@ -32,28 +33,33 @@ function cambiarTab(tabName) {
         btn.classList.remove('active');
         btn.classList.add('text-secondary');
     });
-
+    
     // Iluminar activo (Buscando por el onclick)
     const activeBtn = Array.from(botones).find(b => b.getAttribute('onclick').includes(tabName));
-    if (activeBtn) {
+    if(activeBtn) {
         activeBtn.classList.add('active');
         activeBtn.classList.remove('text-secondary');
     }
 
-    // 4. Título y Cronómetro
-    const titulos = {
-        'rutina': 'Mi Rutina',
-        'recursos': 'Biblioteca',
-        'progreso': 'Tu Progreso',
-        'perfil': 'Mi Cuenta'
-    };
-    document.getElementById('titulo-seccion').innerText = titulos[tabName];
+    // 4. LÓGICA ESPECÍFICA POR PESTAÑA
+    if (tabName === 'progreso') {
+        cargarModuloProgreso(); // <--- ESTO FALTABA: Cargar la lista de historial
+    }
 
-    // Mostrar/Ocultar Cronómetro (Solo en Rutina)
+    // 5. Títulos
+    const titulos = { 
+        'rutina': 'Mi Rutina', 
+        'recursos': 'Biblioteca', 
+        'progreso': 'Historial', // <--- Actualizado a "Historial"
+        'perfil': 'Mi Cuenta' 
+    };
+    document.getElementById('titulo-seccion').innerText = titulos[tabName] || 'Gym System';
+
+    // 6. Cronómetro visible solo en rutina
     const panelTimer = document.getElementById('panel-cronometro');
     if (tabName === 'rutina') {
         panelTimer.classList.remove('d-none');
-        panelTimer.style.display = 'flex'; // Asegurar display flex
+        panelTimer.style.display = 'flex'; 
     } else {
         panelTimer.classList.add('d-none');
     }
@@ -240,6 +246,72 @@ async function cargarBotonesDias(rutinaId) {
     }
 }
 
+// ==========================================
+//      MÓDULO PROGRESO (HISTORIAL COMPLETO)
+// ==========================================
+
+async function cargarModuloProgreso() {
+    const contenedor = document.getElementById('lista-historial-ejercicios');
+    contenedor.innerHTML = '<div class="text-center mt-5"><div class="spinner-border text-warning"></div></div>';
+
+    const { data: { user } } = await clienteSupabase.auth.getUser();
+
+    // 1. Traemos TODO el historial, pero solo necesitamos saber QUÉ ejercicios hay
+    // Usamos select con la relación al catálogo para saber el nombre
+    const { data: historial, error } = await clienteSupabase
+        .from('historial_usuario')
+        .select(`
+            ejercicio_id,
+            ejercicios_catalogo ( nombre )
+        `)
+        .eq('usuario_id', user.id);
+
+    if (error || !historial || historial.length === 0) {
+        contenedor.innerHTML = '<div class="alert alert-dark text-center text-muted">Aún no has registrado datos.</div>';
+        return;
+    }
+
+    // 2. Filtrar ÚNICOS (Porque el historial tiene miles de filas repetidas del mismo ejercicio)
+    const ejerciciosUnicos = {};
+    
+    historial.forEach(item => {
+        // Si tiene catálogo y nombre
+        if (item.ejercicios_catalogo) {
+            const id = item.ejercicio_id;
+            const nombre = item.ejercicios_catalogo.nombre;
+            // Lo guardamos en un objeto para evitar duplicados automáticamente
+            ejerciciosUnicos[id] = nombre;
+        }
+    });
+
+    // 3. Renderizar la lista
+    contenedor.innerHTML = "";
+    
+    // Recorremos las claves del objeto (IDs)
+    Object.keys(ejerciciosUnicos).forEach(id => {
+        const nombre = ejerciciosUnicos[id];
+        
+        const itemHtml = `
+            <div class="card bg-dark border-secondary shadow-sm" onclick="abrirGrafico(${id}, '${nombre}')">
+                <div class="card-body py-3 d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle bg-warning d-flex justify-content-center align-items-center" style="width: 40px; height: 40px;">
+                            <i class="bi bi-graph-up-arrow text-black"></i>
+                        </div>
+                        <h6 class="mb-0 text-white">${nombre}</h6>
+                    </div>
+                    <i class="bi bi-chevron-right text-secondary"></i>
+                </div>
+            </div>
+        `;
+        contenedor.innerHTML += itemHtml;
+    });
+
+    if (Object.keys(ejerciciosUnicos).length === 0) {
+        contenedor.innerHTML = '<div class="alert alert-info text-center">No se encontraron ejercicios.</div>';
+    }
+}
+
 
 // ==========================================
 //      4. EJERCICIOS (DETALLE)
@@ -308,7 +380,7 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
             html += `
                 <div class="card card-ejercicio p-3 animate__animated animate__fadeIn">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h4 class="m-0 text-white" style="max-width: 70%;">${nombreEjercicio}</h4>
+                        <h4 class="m-0 text-white" style="max-width: 75%;">${nombreEjercicio}</h4>
                         
                         <div class="d-flex align-items-center gap-2">
                             <button class="btn btn-sm btn-dark border-secondary text-warning" 
@@ -399,19 +471,20 @@ async function abrirGrafico(ejercicioId, nombre) {
     document.getElementById('tituloGrafico').innerText = nombre;
 
     const { data: { user } } = await clienteSupabase.auth.getUser();
-    const { data: historial } = await clienteSupabase
+    const { data: historial, error } = await clienteSupabase
         .from('historial_usuario')
         .select('fecha_entrenamiento, peso_real')
         .eq('usuario_id', user.id)
-        .eq('ejercicio_id', ejercicioId)
+        .eq('ejercicio_id', ejercicioId) // <--- ESTO DEBE DECIR 'ejercicio_id'
         .gt('peso_real', 0)
         .order('fecha_entrenamiento', { ascending: true })
         .limit(20);
 
-    const etiquetas = historial ? historial.map(h => {
-        const d = new Date(h.fecha_entrenamiento);
-        return `${d.getDate()}/${d.getMonth() + 1}`;
-    }) : [];
+    // 3. Preparar datos para el gráfico
+    const etiquetas = historial.map(h => {
+        const partes = h.fecha_entrenamiento.split('-'); // YYYY-MM-DD
+        return `${partes[2]}/${partes[1]}`; // Retorna DD/MM
+    });
     const valores = historial ? historial.map(h => h.peso_real) : [];
 
     const ctx = document.getElementById('miGrafico').getContext('2d');
