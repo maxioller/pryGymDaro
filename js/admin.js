@@ -14,24 +14,32 @@ async function verificarAdmin() {
 }
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
-    await clienteSupabase.auth.signOut();
-    window.location.href = 'login.html';
+    // Confirmación elegante antes de salir
+    const result = await Popup.fire({
+        title: '¿Cerrar sesión?',
+        text: "Volverás a la pantalla de ingreso.",
+        icon: 'question',
+        confirmButtonText: 'Sí, salir'
+    });
+
+    if (result.isConfirmed) {
+        await clienteSupabase.auth.signOut();
+        window.location.href = 'login.html';
+    }
 });
 
 // Cambio de Vistas (Tabs)
 function cambiarVista(vista) {
     // 1. Ocultar TODAS las secciones
-    document.getElementById('vista-ejercicios').classList.add('d-none');
-    document.getElementById('vista-rutinas').classList.add('d-none');
-    document.getElementById('vista-crear-rutina').classList.add('d-none');
-    document.getElementById('vista-clientes').classList.add('d-none');
-    document.getElementById('vista-recursos').classList.add('d-none');
+    const secciones = ['ejercicios', 'rutinas', 'crear-rutina', 'clientes', 'recursos'];
+    secciones.forEach(s => document.getElementById(`vista-${s}`).classList.add('d-none'));
 
     // 2. Resetear estilos menú
-    document.getElementById('btn-nav-ejercicios').className = 'nav-link text-white link-opacity-75-hover';
-    document.getElementById('btn-nav-rutinas').className = 'nav-link text-white link-opacity-75-hover';
-    document.getElementById('btn-nav-clientes').className = 'nav-link text-white link-opacity-75-hover';
-    document.getElementById('btn-nav-recursos').className = 'nav-link text-white link-opacity-75-hover';
+    const botones = ['ejercicios', 'rutinas', 'clientes', 'recursos'];
+    botones.forEach(b => {
+        const btn = document.getElementById(`btn-nav-${b}`);
+        if(btn) btn.className = 'nav-link text-white link-opacity-75-hover';
+    });
 
     // 3. Mostrar selección
     if (vista === 'ejercicios') {
@@ -47,7 +55,7 @@ function cambiarVista(vista) {
         document.getElementById('vista-clientes').classList.remove('d-none');
         document.getElementById('btn-nav-clientes').className = 'nav-link active bg-warning text-dark fw-bold';
         cargarClientes();
-    }else if (vista === 'recursos') { 
+    } else if (vista === 'recursos') { 
         document.getElementById('vista-recursos').classList.remove('d-none');
         document.getElementById('btn-nav-recursos').className = 'nav-link active bg-warning text-dark fw-bold';
         cargarRecursos();
@@ -63,6 +71,27 @@ let idEjercicioEnEdicion = null; // Variable para saber si estamos editando
 
 async function cargarEjercicios() {
     const tbody = document.getElementById('tabla-ejercicios');
+    
+    // 1. SKELETON ROWS
+    // Generamos 5 filas falsas con bloques grises
+    let skeletonHTML = '';
+    for(let i=0; i<5; i++) {
+        skeletonHTML += `
+            <tr>
+                <td><div class="skeleton skeleton-avatar"></div></td>
+                <td><div class="skeleton skeleton-title mb-0"></div></td>
+                <td><div class="skeleton skeleton-btn" style="width: 60px;"></div></td>
+                <td class="text-end"><div class="d-flex justify-content-end gap-2"><div class="skeleton skeleton-btn" style="width: 35px;"></div><div class="skeleton skeleton-btn" style="width: 35px;"></div></div></td>
+            </tr>
+        `;
+    }
+    tbody.innerHTML = skeletonHTML;
+
+    // 2. FETCH REAL
+    // Hacemos un pequeño delay artificial (300ms) para que se aprecie la animación 
+    // y no sea un parpadeo molesto si el internet es muy rápido.
+    await new Promise(r => setTimeout(r, 300)); 
+
     const { data: ejercicios, error } = await clienteSupabase
         .from('ejercicios_catalogo')
         .select('*')
@@ -77,11 +106,10 @@ async function cargarEjercicios() {
     ejercicios.forEach(ej => {
         const imgUrl = ej.imagen_url || 'https://placehold.co/50x50/333/FFF?text=?';
         const fila = `
-            <tr>
-                <td>
+            <tr class="animate__animated animate__fadeIn"> <td>
                     <img src="${imgUrl}" class="thumb-ejercicio" alt="img" onerror="this.src='https://placehold.co/50x50/333/FFF?text=Error'">
                 </td>
-                <td class="fw-bold">${ej.nombre}</td>
+                <td class="fw-bold text-white">${ej.nombre}</td>
                 <td><span class="badge bg-secondary">${ej.grupo_muscular}</span></td>
                 <td class="text-end">
                     <button class="btn btn-sm btn-outline-warning me-1" onclick="prepararEdicionEjercicio(${ej.id})">
@@ -97,75 +125,62 @@ async function cargarEjercicios() {
     });
 }
 
-// Función para limpiar el modal cuando creamos uno nuevo
 function limpiarModalEjercicio() {
-    idEjercicioEnEdicion = null; // Modo Crear
+    idEjercicioEnEdicion = null; 
     document.getElementById('form-nuevo-ejercicio').reset();
-    // Cambiar título del modal (Opcional, si tienes un ID en el título)
-    // document.querySelector('#modalNuevoEjercicio .modal-title').innerText = "Agregar Ejercicio";
+    document.getElementById('estado-subida').classList.add('d-none');
 }
 
-// Función para cargar los datos en el modal al editar
 async function prepararEdicionEjercicio(id) {
-    // 1. Buscar datos
     const { data: ejercicio, error } = await clienteSupabase
         .from('ejercicios_catalogo')
         .select('*')
         .eq('id', id)
         .single();
 
-    if (error) return alert("Error al cargar el ejercicio");
+    if (error) return Toast.fire({icon: 'error', title: 'Error al cargar'});
 
-    // 2. Llenar campos
     document.getElementById('nombreEjercicio').value = ejercicio.nombre;
     document.getElementById('grupoMuscular').value = ejercicio.grupo_muscular;
     document.getElementById('urlImagen').value = ejercicio.imagen_url || "";
 
-    // 3. Setear estado de edición
     idEjercicioEnEdicion = id;
 
-    // 4. Abrir Modal Manualmente
     const modalElement = document.getElementById('modalNuevoEjercicio');
     const modal = new bootstrap.Modal(modalElement);
     modal.show();
 }
 
-// 3. ESCRIBIR: Guardar nuevo ejercicio (Con subida de archivos)
+// GUARDAR EJERCICIO (Updated with SweetAlert)
 async function guardarEjercicio() {
     const nombre = document.getElementById('nombreEjercicio').value;
     const grupo = document.getElementById('grupoMuscular').value;
     const inputArchivo = document.getElementById('archivoImagen');
-    let urlFinal = document.getElementById('urlImagen').value; // Por defecto, el texto
+    let urlFinal = document.getElementById('urlImagen').value; 
 
-    if (!nombre) return alert("El nombre es obligatorio");
+    if (!nombre) return Toast.fire({ icon: 'warning', title: 'Falta el nombre' });
 
-    // A. SI HAY UN ARCHIVO SELECCIONADO, LO SUBIMOS PRIMERO
+    // A. SI HAY UN ARCHIVO SELECCIONADO
     if (inputArchivo.files.length > 0) {
         const archivo = inputArchivo.files[0];
-        
-        // 1. Mostrar estado de carga
         const estado = document.getElementById('estado-subida');
         estado.classList.remove('d-none');
         
-        // 2. Crear nombre único para el archivo (ej: 174859_press.gif)
         const extension = archivo.name.split('.').pop();
         const nombreArchivo = `${Date.now()}_${nombre.replace(/\s+/g, '')}.${extension}`;
 
-        // 3. Subir a Supabase Storage
-        const { data, error: errorSubida } = await clienteSupabase
+        const { error: errorSubida } = await clienteSupabase
             .storage
-            .from('ejercicios') // Nombre de tu bucket
+            .from('ejercicios') 
             .upload(nombreArchivo, archivo);
 
         if (errorSubida) {
-            alert("Error al subir imagen: " + errorSubida.message);
+            Toast.fire({ icon: 'error', title: 'Error subiendo imagen', text: errorSubida.message });
             estado.classList.add('d-none');
             return;
         }
 
-        // 4. Obtener la URL pública para guardarla en la BD
-        const { data: urlData } = clienteSupabase
-            .storage
+        const { data: urlData } = clienteSupabase.storage
             .from('ejercicios')
             .getPublicUrl(nombreArchivo);
             
@@ -174,77 +189,70 @@ async function guardarEjercicio() {
     }
 
     // B. GUARDAR DATOS EN LA BASE DE DATOS
-    // (Usamos la variable urlFinal, que tendrá el link de Supabase o el que pegaste)
-    
-    const { error } = await clienteSupabase
-        .from('ejercicios_catalogo')
-        .insert([{ 
-            nombre: nombre, 
-            grupo_muscular: grupo, 
-            imagen_url: urlFinal 
-        }]);
+    const payload = { nombre: nombre, grupo_muscular: grupo, imagen_url: urlFinal };
+    let errorDB;
 
-    if (error) {
-        alert("Error al guardar en base de datos: " + error.message);
+    if (idEjercicioEnEdicion) {
+        // UPDATE
+        const { error } = await clienteSupabase.from('ejercicios_catalogo').update(payload).eq('id', idEjercicioEnEdicion);
+        errorDB = error;
     } else {
-        // Cerrar modal y limpiar
+        // INSERT
+        const { error } = await clienteSupabase.from('ejercicios_catalogo').insert([payload]);
+        errorDB = error;
+    }
+
+    if (errorDB) {
+        Toast.fire({ icon: 'error', title: 'Error DB', text: errorDB.message });
+    } else {
+        // ÉXITO
         const el = document.getElementById('modalNuevoEjercicio');
-        const modal = bootstrap.Modal.getInstance(el); // Usamos la instancia existente
+        const modal = bootstrap.Modal.getInstance(el); 
         if(modal) modal.hide();
         
         document.getElementById('form-nuevo-ejercicio').reset();
         cargarEjercicios();
+        
+        Toast.fire({
+            icon: 'success',
+            title: idEjercicioEnEdicion ? 'Ejercicio actualizado' : 'Ejercicio creado'
+        });
     }
 }
 
-// 4. BORRAR: Función inteligente (Borra BD + Storage)
+// BORRAR EJERCICIO (Updated with SweetAlert Popup)
 async function borrarEjercicio(id) {
-    if (!confirm("¿Estás seguro de borrar este ejercicio?")) return;
+    const result = await Popup.fire({
+        title: '¿Borrar ejercicio?',
+        text: "Esta acción no se puede deshacer.",
+        icon: 'warning',
+        confirmButtonText: 'Sí, borrar'
+    });
 
-    // PASO 1: OBTENER DATOS DEL EJERCICIO (Necesitamos la URL de la imagen)
-    const { data: ejercicio, error: errorConsulta } = await clienteSupabase
+    if (!result.isConfirmed) return;
+
+    // 1. Obtener imagen para borrarla del storage
+    const { data: ejercicio } = await clienteSupabase
         .from('ejercicios_catalogo')
         .select('imagen_url')
         .eq('id', id)
         .single();
 
-    if (errorConsulta) {
-        console.error("Error al buscar ejercicio:", errorConsulta);
-        return alert("No se pudo localizar el ejercicio.");
-    }
-
-    // PASO 2: BORRAR LA IMAGEN DEL STORAGE (Solo si existe y es nuestra)
-    if (ejercicio.imagen_url && ejercicio.imagen_url.includes('supabase')) {
+    if (ejercicio && ejercicio.imagen_url && ejercicio.imagen_url.includes('supabase')) {
         try {
-            // La URL es tipo: .../storage/v1/object/public/ejercicios/17823_foto.jpg
-            // Usamos .split('/').pop() para obtener solo "17823_foto.jpg"
             const nombreArchivo = ejercicio.imagen_url.split('/').pop();
-            
-            console.log("Borrando archivo de la nube:", nombreArchivo);
-            
-            const { error: errorStorage } = await clienteSupabase
-                .storage
-                .from('ejercicios')
-                .remove([nombreArchivo]); // Supabase pide un array de nombres
-
-            if (errorStorage) console.warn("No se pudo borrar el archivo del storage:", errorStorage);
-
-        } catch (e) {
-            console.error("Error procesando la imagen:", e);
-        }
+            await clienteSupabase.storage.from('ejercicios').remove([nombreArchivo]);
+        } catch (e) { console.error(e); }
     }
 
-    // PASO 3: BORRAR EL REGISTRO DE LA BASE DE DATOS
-    const { error } = await clienteSupabase
-        .from('ejercicios_catalogo')
-        .delete()
-        .eq('id', id);
+    // 2. Borrar registro
+    const { error } = await clienteSupabase.from('ejercicios_catalogo').delete().eq('id', id);
 
     if (error) {
-        alert("Error al borrar de la base de datos: " + error.message);
+        Toast.fire({ icon: 'error', title: 'Error al borrar', text: error.message });
     } else {
-        // Éxito total
         cargarEjercicios();
+        Toast.fire({ icon: 'success', title: 'Ejercicio eliminado' });
     }
 }
 
@@ -274,9 +282,7 @@ async function cargarRutinas() {
     }
 
     rutinas.forEach(rutina => {
-        const etiquetaTipo = rutina.es_plantilla 
-            ? '<span class="badge bg-info text-dark">Plantilla</span>' 
-            : '<span class="badge bg-secondary">Personalizada</span>';
+        const etiquetaTipo = '<span class="badge bg-info text-dark">Plantilla</span>';
 
         const fila = `
             <tr>
@@ -287,7 +293,6 @@ async function cargarRutinas() {
                     <button class="btn btn-sm btn-outline-info me-1" onclick="previsualizarRutina(${rutina.id})" title="Ver como cliente">
                         <i class="bi bi-eye"></i>
                     </button>
-
                     <button class="btn btn-sm btn-outline-warning me-1" onclick="editarRutina(${rutina.id})">
                         <i class="bi bi-pencil"></i>
                     </button>
@@ -301,24 +306,30 @@ async function cargarRutinas() {
     });
 }
 
+// BORRAR RUTINA (Updated with SweetAlert)
 async function borrarRutina(id) {
-    if (!confirm("¿Estás seguro de eliminar esta rutina? Se borrará también de los clientes asignados.")) return;
+    const result = await Popup.fire({
+        title: '¿Eliminar rutina?',
+        text: "Se borrará también de los clientes que la tengan asignada.",
+        icon: 'warning',
+        confirmButtonText: 'Sí, eliminar'
+    });
 
-    const { error } = await clienteSupabase
-        .from('rutinas')
-        .delete()
-        .eq('id', id);
+    if (!result.isConfirmed) return;
+
+    const { error } = await clienteSupabase.from('rutinas').delete().eq('id', id);
 
     if (error) {
-        alert("Error al borrar: " + error.message);
+        Toast.fire({ icon: 'error', title: 'Error', text: error.message });
     } else {
         cargarRutinas(); 
+        Toast.fire({ icon: 'success', title: 'Rutina eliminada' });
     }
 }
 
 
 // ==========================================
-//      4. CONSTRUCTOR DE RUTINAS (LOGICA)
+//      4. CONSTRUCTOR DE RUTINAS
 // ==========================================
 
 let rutinaTemporal = { nombre: "", dias: { 1: [] }, diaSeleccionado: 1 };
@@ -326,7 +337,6 @@ let idRutinaEnEdicion = null;
 
 function abrirConstructor() {
     cambiarVista('crear-rutina');
-    
     document.getElementById('nombreNuevaRutina').value = "";
     document.getElementById('descripcionRutina').value = "";
     
@@ -356,7 +366,7 @@ async function editarRutina(id) {
         .single();
 
     if (errorHeader) {
-        alert("Error al cargar la rutina");
+        Toast.fire({ icon: 'error', title: 'Error', text: 'No se encontró la rutina' });
         cambiarVista('rutinas');
         return;
     }
@@ -367,28 +377,17 @@ async function editarRutina(id) {
     // 2. Cargar Detalles
     const { data: detalles } = await clienteSupabase
         .from('rutinas_detalles')
-        .select(`
-            *,
-            rutinas_dias!inner ( dia_numero ),
-            ejercicios_catalogo ( nombre )
-        `)
+        .select(`*, rutinas_dias!inner ( dia_numero ), ejercicios_catalogo ( nombre )`)
         .eq('rutinas_dias.rutina_id', id)
         .order('orden_ejercicio', { ascending: true });
 
     // 3. Reconstruir Objeto Temporal
-    rutinaTemporal = { 
-        nombre: rutina.nombre, 
-        dias: {}, 
-        diaSeleccionado: 1 
-    };
+    rutinaTemporal = { nombre: rutina.nombre, dias: {}, diaSeleccionado: 1 };
 
     if (detalles && detalles.length > 0) {
         detalles.forEach(d => {
             const numDia = d.rutinas_dias.dia_numero;
-            
-            if (!rutinaTemporal.dias[numDia]) {
-                rutinaTemporal.dias[numDia] = [];
-            }
+            if (!rutinaTemporal.dias[numDia]) rutinaTemporal.dias[numDia] = [];
 
             const existe = rutinaTemporal.dias[numDia].find(item => item._orden_bd === d.orden_ejercicio);
             
@@ -409,13 +408,8 @@ async function editarRutina(id) {
     } else {
         rutinaTemporal.dias[1] = [];
     }
-
-    const maxDia = Object.keys(rutinaTemporal.dias).length > 0 
-        ? Math.max(...Object.keys(rutinaTemporal.dias).map(Number)) 
-        : 1;
         
-    rutinaTemporal.diaSeleccionado = 1; // Ir al día 1 por defecto
-    
+    rutinaTemporal.diaSeleccionado = 1; 
     renderizarTabs(); 
     cargarCatalogoLateral();
     renderizarDiaActual();
@@ -424,10 +418,8 @@ async function editarRutina(id) {
     btnGuardar.disabled = false;
 }
 
-
 // --- Helpers del Constructor ---
 async function cargarCatalogoLateral() {
-    const contenedor = document.getElementById('lista-catalogo-lateral');
     const { data: ejercicios } = await clienteSupabase
         .from('ejercicios_catalogo')
         .select('*')
@@ -440,6 +432,8 @@ async function cargarCatalogoLateral() {
 function dibujarCatalogo(lista) {
     const contenedor = document.getElementById('lista-catalogo-lateral');
     contenedor.innerHTML = "";
+    if(!lista) return;
+
     lista.forEach(ej => {
         const imgUrl = ej.imagen_url || 'https://placehold.co/40x40/333/FFF?text=+';
         const html = `
@@ -491,13 +485,10 @@ function renderizarDiaActual() {
     const dia = rutinaTemporal.diaSeleccionado;
     const ejerciciosDelDia = rutinaTemporal.dias[dia] || [];
 
-    const spanDia = document.getElementById('span-dia-actual');
-    if (spanDia) spanDia.innerText = dia;
-
     if (ejerciciosDelDia.length === 0) {
         contenedor.innerHTML = `<p class="text-muted text-center mt-5">
             <i class="bi bi-arrow-left-circle fs-1 d-block mb-2"></i>
-            Selecciona ejercicios del menú izquierdo para agregarlos al Día <span id="span-dia-actual">${dia}</span>
+            Selecciona ejercicios del menú izquierdo para agregarlos al Día ${dia}
         </p>`;
         return;
     }
@@ -576,21 +567,13 @@ function renderizarTabs() {
     const diaActual = rutinaTemporal.diaSeleccionado;
 
     contenedor.innerHTML = '';
-
     for (let i = 1; i <= totalDias; i++) {
         const isActive = i === diaActual;
         const clase = isActive ? 'btn-warning fw-bold active' : 'btn-outline-secondary';
-        
-        contenedor.innerHTML += `
-            <button type="button" class="btn ${clase}" onclick="seleccionarDia(${i})">
-                Día ${i}
-            </button>`;
+        contenedor.innerHTML += `<button type="button" class="btn ${clase}" onclick="seleccionarDia(${i})">Día ${i}</button>`;
     }
 
-    contenedor.innerHTML += `
-        <button type="button" class="btn btn-outline-secondary" onclick="agregarDia()">
-            + Día
-        </button>`;
+    contenedor.innerHTML += `<button type="button" class="btn btn-outline-secondary" onclick="agregarDia()">+ Día</button>`;
 
     if (totalDias > 1) {
         contenedor.innerHTML += `
@@ -600,28 +583,29 @@ function renderizarTabs() {
     }
 }
 
-function eliminarDiaActual() {
+async function eliminarDiaActual() {
     const diaActual = rutinaTemporal.diaSeleccionado;
     const totalDias = Object.keys(rutinaTemporal.dias).length;
+    if (totalDias <= 1) return Toast.fire({ icon: 'info', title: 'Mínimo un día requerido' });
+    
+    const result = await Popup.fire({
+        title: `¿Borrar Día ${diaActual}?`,
+        text: "Se eliminarán los ejercicios de este día.",
+        icon: 'warning'
+    });
 
-    if (totalDias <= 1) return alert("La rutina debe tener al menos un día.");
-    if (!confirm(`¿Estás seguro de eliminar el DÍA ${diaActual} y todos sus ejercicios?`)) return;
+    if (!result.isConfirmed) return;
 
     const nuevosDias = {};
     let contador = 1;
-
     for (let i = 1; i <= totalDias; i++) {
         if (i !== diaActual) {
             nuevosDias[contador] = rutinaTemporal.dias[i];
             contador++;
         }
     }
-
     rutinaTemporal.dias = nuevosDias;
-
-    if (diaActual > Object.keys(nuevosDias).length) {
-        rutinaTemporal.diaSeleccionado = diaActual - 1;
-    }
+    if (diaActual > Object.keys(nuevosDias).length) rutinaTemporal.diaSeleccionado = diaActual - 1;
 
     renderizarTabs();
     renderizarDiaActual();
@@ -640,18 +624,15 @@ function eliminarItem(idTemp) {
 }
 
 
-// ==========================================
-//      5. GUARDAR RUTINA
-// ==========================================
-
+// GUARDAR RUTINA COMPLETA (Updated with SweetAlert)
 async function guardarRutinaCompleta() {
     const nombre = document.getElementById('nombreNuevaRutina').value;
     const descripcion = document.getElementById('descripcionRutina').value;
 
-    if (!nombre) return alert("Por favor, ponle un nombre a la rutina.");
+    if (!nombre) return Toast.fire({ icon: 'warning', title: 'Falta el nombre de la rutina' });
     
     const diasConEjercicios = Object.values(rutinaTemporal.dias).some(lista => lista.length > 0);
-    if (!diasConEjercicios) return alert("La rutina está vacía.");
+    if (!diasConEjercicios) return Toast.fire({ icon: 'warning', title: 'La rutina está vacía' });
 
     const btnGuardar = document.querySelector('#vista-crear-rutina .btn-success');
     const textoOriginal = btnGuardar.innerHTML;
@@ -663,16 +644,14 @@ async function guardarRutinaCompleta() {
         let rutinaId = idRutinaEnEdicion; 
 
         if (rutinaId) {
-            // === MODO UPDATE ===
-            await clienteSupabase.from('rutinas')
-                .update({ 
+            // === UPDATE ===
+            await clienteSupabase.from('rutinas').update({ 
                     nombre: nombre, 
                     descripcion: descripcion,
                     nivel_dias: Object.keys(rutinaTemporal.dias).length 
-                })
-                .eq('id', rutinaId);
+                }).eq('id', rutinaId);
 
-            // Borrar datos viejos
+            // Borrar estructura vieja
             const { data: diasViejos } = await clienteSupabase.from('rutinas_dias').select('id').eq('rutina_id', rutinaId);
             if (diasViejos.length > 0) {
                 const ids = diasViejos.map(d => d.id);
@@ -681,7 +660,7 @@ async function guardarRutinaCompleta() {
             }
 
         } else {
-            // === MODO INSERT ===
+            // === INSERT ===
             const { data: nueva, error } = await clienteSupabase
                 .from('rutinas')
                 .insert([{
@@ -689,32 +668,25 @@ async function guardarRutinaCompleta() {
                     descripcion: descripcion,
                     es_plantilla: true,
                     creador_id: user.id,
-                    nivel_dias: Object.keys(rutinaTemporal.dias).length,
-                    genero_objetivo: 'mixto'
-                }])
-                .select().single();
+                    nivel_dias: Object.keys(rutinaTemporal.dias).length
+                }]).select().single();
             
             if(error) throw error;
             rutinaId = nueva.id;
         }
 
-        // === INSERTAR CONTENIDO ===
+        // === RE-INSERTAR DETALLES ===
         for (const numDia of Object.keys(rutinaTemporal.dias)) {
             const ejerciciosDelDia = rutinaTemporal.dias[numDia];
             if (ejerciciosDelDia.length === 0) continue;
 
             const { data: diaCreado, error: errorDia } = await clienteSupabase
                 .from('rutinas_dias')
-                .insert([{
-                    rutina_id: rutinaId,
-                    dia_numero: parseInt(numDia),
-                    grupo_muscular_objetivo: 'General'
-                }])
+                .insert([{ rutina_id: rutinaId, dia_numero: parseInt(numDia), grupo_muscular_objetivo: 'General' }])
                 .select().single();
 
             if (errorDia) throw errorDia;
-            const diaId = diaCreado.id;
-
+            
             let filasParaInsertar = [];
             let contadorEjercicio = 0; 
             let ultimoEjercicioId = null;
@@ -726,12 +698,10 @@ async function guardarRutinaCompleta() {
                     contadorSerie = 1;   
                     ultimoEjercicioId = item.ejercicio_id;
                 } 
-
                 const cantidadSeries = parseInt(item.series) || 1;
-
                 for (let i = 0; i < cantidadSeries; i++) {
                     filasParaInsertar.push({
-                        dia_id: diaId,
+                        dia_id: diaCreado.id,
                         ejercicio_id: item.ejercicio_id,
                         orden_ejercicio: contadorEjercicio, 
                         orden_serie: contadorSerie, 
@@ -745,20 +715,26 @@ async function guardarRutinaCompleta() {
                 }
             });
 
-            const { error: errorDetalles } = await clienteSupabase
-                .from('rutinas_detalles')
-                .insert(filasParaInsertar);
-
+            const { error: errorDetalles } = await clienteSupabase.from('rutinas_detalles').insert(filasParaInsertar);
             if (errorDetalles) throw errorDetalles;
         }
 
-        alert(rutinaId ? "¡Rutina actualizada!" : "¡Rutina creada!");
+        Swal.fire({
+            title: '¡Excelente!',
+            text: rutinaId ? 'Rutina actualizada correctamente.' : 'Rutina creada con éxito.',
+            icon: 'success',
+            background: '#1e2126',
+            color: '#fff',
+            confirmButtonColor: '#ffc107',
+            confirmButtonText: 'Genial'
+        });
+
         abrirConstructor(); 
         cambiarVista('rutinas');
 
     } catch (error) {
         console.error("Error:", error);
-        alert("Hubo un error. Revisa la consola.");
+        Toast.fire({ icon: 'error', title: 'Error al guardar', text: error.message });
     } finally {
         btnGuardar.disabled = false;
         btnGuardar.innerHTML = textoOriginal;
@@ -766,7 +742,7 @@ async function guardarRutinaCompleta() {
 }
 
 // ==========================================
-//      MÓDULO 4: GESTIÓN DE CLIENTES
+//      5. GESTIÓN DE CLIENTES & ASIGNACIÓN
 // ==========================================
 
 async function cargarClientes() {
@@ -789,7 +765,6 @@ async function cargarClientes() {
         .eq('activa', true);
 
     tbody.innerHTML = '';
-
     clientes.forEach(cliente => {
         const asignacion = asignaciones.find(a => a.cliente_id === cliente.id);
         const nombreRutina = asignacion ? asignacion.rutinas.nombre : '<span class="text-muted fst-italic">Sin asignar</span>';
@@ -800,7 +775,7 @@ async function cargarClientes() {
                 <td class="fw-bold text-white">
                     <div class="d-flex align-items-center">
                         <div class="rounded-circle bg-secondary d-flex justify-content-center align-items-center me-2 small" style="width: 30px; height: 30px;">
-                            ${cliente.nombre.charAt(0).toUpperCase()}
+                            ${cliente.nombre ? cliente.nombre.charAt(0).toUpperCase() : '?'}
                         </div>
                         ${cliente.nombre}
                     </div>
@@ -813,7 +788,7 @@ async function cargarClientes() {
                 </td>
                 <td class="text-end">
                     <button class="btn btn-sm btn-warning fw-bold" onclick="abrirModalAsignar('${cliente.id}', '${cliente.nombre}')">
-                        Asignar Rutina
+                        Asignar
                     </button>
                 </td>
             </tr>
@@ -822,7 +797,6 @@ async function cargarClientes() {
     });
 }
 
-// A. ABRIR MODAL Y CARGAR LISTAS (Rutinas + Recursos)
 async function abrirModalAsignar(clienteId, nombreCliente) {
     document.getElementById('idClienteAsignar').value = clienteId;
     document.getElementById('nombreClienteAsignar').innerText = nombreCliente;
@@ -831,88 +805,71 @@ async function abrirModalAsignar(clienteId, nombreCliente) {
     const selReceta = document.getElementById('selectReceta');
     const selSugerencia = document.getElementById('selectSugerencia');
 
-    // Limpiar selects con loading
     selRutina.innerHTML = '<option>Cargando...</option>';
     selReceta.innerHTML = '<option>Cargando...</option>';
     selSugerencia.innerHTML = '<option>Cargando...</option>';
 
-    // 1. Cargar Rutinas
+    // Cargar Rutinas
     const { data: rutinas } = await clienteSupabase
-        .from('rutinas')
-        .select('id, nombre')
-        .eq('es_plantilla', true)
-        .order('nombre');
+        .from('rutinas').select('id, nombre').eq('es_plantilla', true).order('nombre');
 
     selRutina.innerHTML = '';
     if (!rutinas || rutinas.length === 0) selRutina.innerHTML = '<option value="">-- Sin plantillas --</option>';
     else rutinas.forEach(r => selRutina.innerHTML += `<option value="${r.id}">${r.nombre}</option>`);
 
-    // 2. Cargar Recursos (Recetas y Sugerencias)
-    const { data: recursos } = await clienteSupabase
-        .from('recursos')
-        .select('id, nombre, tipo');
-
-    // Limpiar y poner default
+    // Cargar Recursos
+    const { data: recursos } = await clienteSupabase.from('recursos').select('id, nombre, tipo');
     selReceta.innerHTML = '<option value="">-- Ninguna --</option>';
     selSugerencia.innerHTML = '<option value="">-- Ninguno --</option>';
 
     if (recursos) {
         recursos.forEach(r => {
-            if (r.tipo === 'receta') {
-                selReceta.innerHTML += `<option value="${r.id}">${r.nombre}</option>`;
-            } else if (r.tipo === 'sugerencia') {
-                selSugerencia.innerHTML += `<option value="${r.id}">${r.nombre}</option>`;
-            }
+            if (r.tipo === 'receta') selReceta.innerHTML += `<option value="${r.id}">${r.nombre}</option>`;
+            else if (r.tipo === 'sugerencia') selSugerencia.innerHTML += `<option value="${r.id}">${r.nombre}</option>`;
         });
     }
 
     new bootstrap.Modal(document.getElementById('modalAsignar')).show();
 }
 
-// B. GUARDAR LA ASIGNACIÓN COMPLETA
+// GUARDAR ASIGNACIÓN (Updated with SweetAlert)
 async function guardarAsignacion() {
     const clienteId = document.getElementById('idClienteAsignar').value;
     const rutinaId = document.getElementById('selectRutinaAsignar').value;
-    
-    // Obtenemos los valores (si es cadena vacía "", se convierte en null)
     const recetaId = document.getElementById('selectReceta').value || null;
     const sugerenciaId = document.getElementById('selectSugerencia').value || null;
 
-    if (!rutinaId) return alert("Selecciona una rutina obligatoria");
+    if (!rutinaId) return Toast.fire({ icon: 'warning', title: 'Selecciona una rutina' });
 
-    // Desactivar anterior
-    await clienteSupabase
-        .from('asignaciones_rutinas')
-        .update({ activa: false })
-        .eq('cliente_id', clienteId);
+    await clienteSupabase.from('asignaciones_rutinas').update({ activa: false }).eq('cliente_id', clienteId);
 
-    // Insertar nueva con recursos
-    const { error } = await clienteSupabase
-        .from('asignaciones_rutinas')
-        .insert([{
-            cliente_id: clienteId,
-            rutina_id: rutinaId,
-            activa: true,
-            recurso_receta_id: recetaId,       // <--- NUEVO
-            recurso_sugerencia_id: sugerenciaId // <--- NUEVO
-        }]);
+    const { error } = await clienteSupabase.from('asignaciones_rutinas').insert([{
+        cliente_id: clienteId,
+        rutina_id: rutinaId,
+        activa: true,
+        recurso_receta_id: recetaId,      
+        recurso_sugerencia_id: sugerenciaId
+    }]);
 
     if (error) {
-        alert("Error al asignar: " + error.message);
+        Toast.fire({ icon: 'error', title: 'Error', text: error.message });
     } else {
-        alert("¡Asignación guardada con éxito!");
         const el = document.getElementById('modalAsignar');
         const modal = bootstrap.Modal.getInstance(el);
         if(modal) modal.hide();
+        
         cargarClientes();
+        Swal.fire({
+            icon: 'success',
+            title: '¡Asignación guardada!',
+            background: '#1e2126', color: '#fff', confirmButtonColor: '#ffc107', confirmButtonText: 'OK'
+        });
     }
 }
 
 // ==========================================
-//      MÓDULO 5: PREVISUALIZACIÓN
+//      6. PREVISUALIZACIÓN & RECURSOS
 // ==========================================
-
-let datosPreviewGlobal = {}; 
 
 async function previsualizarRutina(id) {
     const modal = new bootstrap.Modal(document.getElementById('modalPrevisualizar'));
@@ -921,17 +878,13 @@ async function previsualizarRutina(id) {
     
     const { data: detalles, error } = await clienteSupabase
         .from('rutinas_detalles')
-        .select(`
-            *,
-            rutinas_dias!inner ( dia_numero, rutina_id, rutinas ( nombre, descripcion ) ),
-            ejercicios_catalogo ( nombre, imagen_url )
-        `)
+        .select(`*, rutinas_dias!inner ( dia_numero, rutinas ( nombre, descripcion ) ), ejercicios_catalogo ( nombre, imagen_url )`)
         .eq('rutinas_dias.rutina_id', id)
         .order('orden_ejercicio', { ascending: true })
         .order('orden_serie', { ascending: true });
 
     if (error || detalles.length === 0) {
-        document.getElementById('contenido-preview').innerHTML = '<p class="text-center text-danger">No se pudo cargar la rutina o está vacía.</p>';
+        document.getElementById('contenido-preview').innerHTML = '<p class="text-center text-danger">Rutina vacía.</p>';
         return;
     }
 
@@ -939,58 +892,46 @@ async function previsualizarRutina(id) {
     document.getElementById('tituloPreview').innerText = infoRutina.nombre;
     document.getElementById('descPreview').innerText = infoRutina.descripcion || "Sin descripción";
 
-    datosPreviewGlobal = {}; 
-    
+    let datosPreview = {}; 
     detalles.forEach(d => {
         const numDia = d.rutinas_dias.dia_numero;
-        if (!datosPreviewGlobal[numDia]) datosPreviewGlobal[numDia] = [];
-        datosPreviewGlobal[numDia].push(d);
+        if (!datosPreview[numDia]) datosPreview[numDia] = [];
+        datosPreview[numDia].push(d);
     });
 
     const contenedorTabs = document.getElementById('tabs-dias-preview');
     contenedorTabs.innerHTML = '';
-    const diasDisponibles = Object.keys(datosPreviewGlobal).sort();
+    const diasDisponibles = Object.keys(datosPreview).sort();
 
     diasDisponibles.forEach((dia, index) => {
         const btn = document.createElement('button');
         const clase = index === 0 ? 'btn-warning fw-bold' : 'btn-outline-secondary'; 
         btn.className = `btn ${clase} btn-sm`;
         btn.innerText = `Día ${dia}`;
-        btn.onclick = () => renderizarDiaPreview(dia);
+        btn.onclick = () => {
+             // Lógica simple de tabs dentro del modal
+             Array.from(contenedorTabs.children).forEach(b => b.className = 'btn btn-outline-secondary btn-sm');
+             btn.className = 'btn btn-warning fw-bold btn-sm';
+             renderizarDiaPreview(datosPreview[dia]);
+        };
         contenedorTabs.appendChild(btn);
     });
 
-    renderizarDiaPreview(diasDisponibles[0]);
+    renderizarDiaPreview(datosPreview[diasDisponibles[0]]);
 }
 
-function renderizarDiaPreview(dia) {
-    const tabs = document.getElementById('tabs-dias-preview').children;
-    for (let btn of tabs) {
-        if (btn.innerText === `Día ${dia}`) {
-            btn.className = 'btn btn-warning fw-bold btn-sm';
-        } else {
-            btn.className = 'btn btn-outline-secondary btn-sm';
-        }
-    }
-
+function renderizarDiaPreview(ejercicios) {
     const contenedor = document.getElementById('contenido-preview');
-    const ejercicios = datosPreviewGlobal[dia];
     contenedor.innerHTML = '';
-
     let tarjetaActualIdx = null;
     let html = '';
 
     ejercicios.forEach(fila => {
-        
-        const esNuevaTarjeta = fila.orden_ejercicio !== tarjetaActualIdx;
-        
-        if (esNuevaTarjeta) {
+        if (fila.orden_ejercicio !== tarjetaActualIdx) {
             if (tarjetaActualIdx !== null) html += `</div></div>`; 
             tarjetaActualIdx = fila.orden_ejercicio;
-
             const img = fila.ejercicios_catalogo.imagen_url 
-                ? `<div class="text-center mb-3"><img src="${fila.ejercicios_catalogo.imagen_url}" class="img-fluid rounded" style="max-height: 150px;" onerror="this.style.display='none'"></div>` 
-                : '';
+                ? `<div class="text-center mb-3"><img src="${fila.ejercicios_catalogo.imagen_url}" class="img-fluid rounded" style="max-height: 150px;"></div>` : '';
 
             html += `
                 <div class="card-preview p-3 animate__animated animate__fadeIn">
@@ -1002,91 +943,55 @@ function renderizarDiaPreview(dia) {
                     <div class="lista-series">
             `;
         }
-
-        const badgeClass = fila.tipo_serie === 'calentamiento' ? 'bg-secondary' : 'bg-success';
-        const textoTipo = fila.tipo_serie ? fila.tipo_serie.toUpperCase() : 'TRABAJO';
-        const notaSerie = fila.observaciones ? `<div class="text-warning small fst-italic">${fila.observaciones}</div>` : '';
-
         html += `
             <div class="fila-serie-preview row align-items-center text-white">
                 <div class="col-6">
-                    <span class="badge ${badgeClass} mb-1" style="font-size: 0.6rem;">${textoTipo}</span>
+                    <span class="badge ${fila.tipo_serie === 'calentamiento' ? 'bg-secondary' : 'bg-success'} mb-1">${fila.tipo_serie}</span>
                     <div class="fw-bold">${fila.reps_objetivo} <span class="text-muted fw-normal">reps</span></div>
-                    ${notaSerie}
                 </div>
-                <div class="col-6 text-end">
-                    <span class="text-muted small me-2">${fila.descanso_info || ''}</span>
-                    <div class="input-fake">kg</div>
-                    <input type="checkbox" disabled class="form-check-input bg-dark border-secondary ms-2">
-                </div>
-            </div>
-        `;
+                <div class="col-6 text-end"><span class="text-muted small">${fila.descanso_info || ''}</span></div>
+            </div>`;
     });
-
     if (ejercicios.length > 0) html += `</div></div>`;
     contenedor.innerHTML = html;
 }
 
-// ==========================================
-//      MÓDULO 5: RECURSOS (ARCHIVOS)
-// ==========================================
-
+// RECURSOS
 async function cargarRecursos() {
     const contenedor = document.getElementById('contenedor-recursos');
     contenedor.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-warning"></div></div>';
-
-    const { data: recursos, error } = await clienteSupabase
-        .from('recursos')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error(error);
-        contenedor.innerHTML = '<p class="text-danger text-center">Error cargando recursos</p>';
-        return;
-    }
     
+    const { data: recursos, error } = await clienteSupabase.from('recursos').select('*').order('created_at', { ascending: false });
+
+    if (error) return contenedor.innerHTML = '<p class="text-danger">Error</p>';
     contenedor.innerHTML = '';
     
-    if (recursos.length === 0) {
-        contenedor.innerHTML = '<p class="text-muted text-center col-12 py-5">No hay archivos subidos aún.</p>';
-        return;
-    }
+    if (recursos.length === 0) return contenedor.innerHTML = '<p class="text-muted text-center col-12">No hay archivos.</p>';
 
     recursos.forEach(r => {
-        const icono = r.tipo === 'receta' ? 'bi-egg-fried' : 'bi-lightbulb';
-        const colorIcono = r.tipo === 'receta' ? 'text-success' : 'text-info';
+        const icono = r.tipo === 'receta' ? 'bi-egg-fried text-success' : 'bi-lightbulb text-info';
         const borde = r.tipo === 'receta' ? 'border-success' : 'border-info';
         
-        const html = `
+        contenedor.innerHTML += `
             <div class="col-md-4 mb-3">
                 <div class="card bg-dark-subtle border-start border-4 ${borde} h-100 shadow-sm">
                     <div class="card-body d-flex align-items-center">
-                        <i class="bi ${icono} fs-1 ${colorIcono} me-3"></i>
+                        <i class="bi ${icono} fs-1 me-3"></i>
                         <div class="flex-grow-1 overflow-hidden">
-                            <h6 class="text-white mb-1 text-truncate" title="${r.nombre}">${r.nombre}</h6>
-                            <a href="${r.archivo_url}" target="_blank" class="small text-warning text-decoration-none hover-underline">
-                                <i class="bi bi-eye me-1"></i>Ver archivo
-                            </a>
+                            <h6 class="text-white mb-1 text-truncate">${r.nombre}</h6>
+                            <a href="${r.archivo_url}" target="_blank" class="small text-warning text-decoration-none">Ver archivo</a>
                         </div>
-                        <button class="btn btn-sm btn-outline-danger ms-2" onclick="borrarRecurso(${r.id})">
-                            <i class="bi bi-trash"></i>
-                        </button>
+                        <button class="btn btn-sm btn-outline-danger ms-2" onclick="borrarRecurso(${r.id})"><i class="bi bi-trash"></i></button>
                     </div>
                 </div>
-            </div>
-        `;
-        contenedor.innerHTML += html;
+            </div>`;
     });
 }
 
 function abrirModalRecurso() {
     document.getElementById('form-recurso').reset();
     document.getElementById('status-recurso').classList.add('d-none');
-    
-    // Usamos el método nativo que ya nos funcionó antes
-    const modal = new bootstrap.Modal(document.getElementById('modalRecurso'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('modalRecurso')).show();
 }
 
 async function guardarRecurso() {
@@ -1094,75 +999,61 @@ async function guardarRecurso() {
     const tipo = document.getElementById('tipoRecurso').value;
     const input = document.getElementById('fileRecurso');
 
-    if (!nombre || input.files.length === 0) return alert("Completa el nombre y selecciona un archivo");
+    if (!nombre || input.files.length === 0) return Toast.fire({ icon: 'warning', title: 'Faltan datos' });
 
-    // UI Loading
-    const status = document.getElementById('status-recurso');
-    status.classList.remove('d-none');
+    document.getElementById('status-recurso').classList.remove('d-none');
     
     try {
-        // 1. Subir archivo al Storage
         const archivo = input.files[0];
-        // Limpiamos el nombre de caracteres raros
         const ext = archivo.name.split('.').pop();
         const path = `${tipo}_${Date.now()}.${ext}`;
 
-        const { error: errUpload } = await clienteSupabase.storage
-            .from('materiales') // Asegúrate que tu bucket se llame así
-            .upload(path, archivo);
+        const { error: errUpload } = await clienteSupabase.storage.from('materiales').upload(path, archivo);
+        if (errUpload) throw new Error("Error subiendo: " + errUpload.message);
 
-        if (errUpload) throw new Error("Error subiendo archivo: " + errUpload.message);
+        const { data: urlData } = clienteSupabase.storage.from('materiales').getPublicUrl(path);
 
-        // Obtener URL Pública
-        const { data: urlData } = clienteSupabase.storage
-            .from('materiales')
-            .getPublicUrl(path);
+        const { error: errDb } = await clienteSupabase.from('recursos').insert([{ 
+            nombre: nombre, tipo: tipo, archivo_url: urlData.publicUrl 
+        }]);
+        if (errDb) throw new Error("Error DB");
 
-        // 2. Guardar registro en Base de Datos
-        const { error: errDb } = await clienteSupabase
-            .from('recursos')
-            .insert([{ 
-                nombre: nombre, 
-                tipo: tipo, 
-                archivo_url: urlData.publicUrl 
-            }]);
-
-        if (errDb) throw new Error("Error guardando en base de datos");
-
-        // Éxito
-        alert("¡Recurso subido!");
-        
-        // Cerrar modal (método fallback seguro)
         const el = document.getElementById('modalRecurso');
         const modal = bootstrap.Modal.getInstance(el);
         if (modal) modal.hide();
 
         cargarRecursos();
+        Toast.fire({ icon: 'success', title: 'Recurso subido' });
 
     } catch (error) {
-        console.error(error);
-        alert(error.message);
+        Toast.fire({ icon: 'error', title: 'Error', text: error.message });
     } finally {
-        status.classList.add('d-none');
+        document.getElementById('status-recurso').classList.add('d-none');
     }
 }
 
 async function borrarRecurso(id) {
-    if(!confirm("¿Seguro que quieres borrar este archivo?")) return;
+    const result = await Popup.fire({ title: '¿Borrar archivo?', icon: 'warning', confirmButtonText: 'Sí, borrar' });
+    if(!result.isConfirmed) return;
     
-    const { error } = await clienteSupabase
-        .from('recursos')
-        .delete()
-        .eq('id', id);
-
-    if (error) alert("Error al borrar");
-    else cargarRecursos();
+    const { error } = await clienteSupabase.from('recursos').delete().eq('id', id);
+    if (error) Toast.fire({ icon: 'error', title: 'Error' });
+    else {
+        cargarRecursos();
+        Toast.fire({ icon: 'success', title: 'Eliminado' });
+    }
 }
 
-// ==========================================
-//      INICIO SEGURO
-// ==========================================
+// TOGGLE MENU
+function toggleMenu() {
+    const sidebar = document.querySelector('.sidebar');
+    const body = document.body;
+    sidebar.classList.toggle('active');
+    if (sidebar.classList.contains('active')) body.classList.add('menu-open');
+    else body.classList.remove('menu-open');
+}
 
+// INICIO
 document.addEventListener('DOMContentLoaded', () => {
     verificarAdmin();
 });

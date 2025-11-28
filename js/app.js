@@ -6,56 +6,45 @@
 function obtenerFechaLocal() {
     const ahora = new Date();
     const anio = ahora.getFullYear();
-    // Los meses van de 0 a 11, por eso sumamos 1
     const mes = String(ahora.getMonth() + 1).padStart(2, '0');
     const dia = String(ahora.getDate()).padStart(2, '0');
-    return `${anio}-${mes}-${dia}`; // Retorna "2025-11-25" (texto plano)
+    return `${anio}-${mes}-${dia}`; 
 }
-
 
 // ==========================================
 //      1. NAVEGACIÓN (TABS & UI)
 // ==========================================
 function cambiarTab(tabName) {
-    // 1. Ocultar todas las vistas
     document.getElementById('view-rutina').classList.add('d-none');
     document.getElementById('view-recursos').classList.add('d-none');
     document.getElementById('view-progreso').classList.add('d-none');
     document.getElementById('view-perfil').classList.add('d-none');
 
-    // 2. Mostrar seleccionada
     const view = document.getElementById(`view-${tabName}`);
     if(view) view.classList.remove('d-none');
 
-    // 3. Actualizar botones inferiores
     const botones = document.querySelectorAll('.nav-item-bottom');
     botones.forEach(btn => {
         btn.classList.remove('active');
         btn.classList.add('text-secondary');
     });
     
-    // Iluminar activo (Buscando por el onclick)
     const activeBtn = Array.from(botones).find(b => b.getAttribute('onclick').includes(tabName));
     if(activeBtn) {
         activeBtn.classList.add('active');
         activeBtn.classList.remove('text-secondary');
     }
 
-    // 4. LÓGICA ESPECÍFICA POR PESTAÑA
-    if (tabName === 'progreso') {
-        cargarModuloProgreso(); // <--- ESTO FALTABA: Cargar la lista de historial
-    }
+    if (tabName === 'progreso') cargarModuloProgreso();
 
-    // 5. Títulos
     const titulos = { 
         'rutina': 'Mi Rutina', 
         'recursos': 'Biblioteca', 
-        'progreso': 'Historial', // <--- Actualizado a "Historial"
+        'progreso': 'Historial', 
         'perfil': 'Mi Cuenta' 
     };
     document.getElementById('titulo-seccion').innerText = titulos[tabName] || 'Gym System';
 
-    // 6. Cronómetro visible solo en rutina
     const panelTimer = document.getElementById('panel-cronometro');
     if (tabName === 'rutina') {
         panelTimer.classList.remove('d-none');
@@ -79,24 +68,16 @@ async function verificarSesion() {
     }
 
     const userId = session.user.id;
-
-    // Verificar Rol y Cargar Perfil
-    const { data: perfil } = await clienteSupabase
-        .from('perfiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+    const { data: perfil } = await clienteSupabase.from('perfiles').select('*').eq('id', userId).single();
 
     if (perfil) {
         if (perfil.rol === 'entrenador') {
             window.location.href = 'admin.html';
             return;
         }
-        // Llenar perfil
         document.getElementById('perfil-nombre').innerText = perfil.nombre || "Usuario";
         document.getElementById('perfil-email').innerText = session.user.email;
 
-        // INYECTAR SALUDO EN EL HEADER
         const nombreCorto = perfil.nombre ? perfil.nombre.split(' ')[0] : 'Atleta';
         const divSaludo = document.getElementById('header-saludo');
         if (divSaludo) divSaludo.innerText = `¡Hola, ${nombreCorto}! 👋`;
@@ -105,12 +86,21 @@ async function verificarSesion() {
     cargarRutinaActiva(userId);
 }
 
-// Botón Cerrar Sesión
+// Botón Cerrar Sesión (MEJORADO CON POPUP)
 const btnLogout = document.getElementById('btn-logout');
 if (btnLogout) {
     btnLogout.addEventListener('click', async () => {
-        await clienteSupabase.auth.signOut();
-        window.location.href = 'login.html';
+        const result = await Popup.fire({
+            title: '¿Ya te vas?',
+            text: "Cerrarás tu sesión actual.",
+            icon: 'question',
+            confirmButtonText: 'Sí, salir'
+        });
+
+        if (result.isConfirmed) {
+            await clienteSupabase.auth.signOut();
+            window.location.href = 'login.html';
+        }
     });
 }
 
@@ -120,47 +110,32 @@ if (btnLogout) {
 // ==========================================
 
 async function cargarRutinaActiva() {
-    const contenedorTitulo = document.querySelector('h2'); // En el diseño nuevo es #titulo-seccion, pero mantenemos lógica
     const { data: { user } } = await clienteSupabase.auth.getUser();
 
-    // 1. Buscamos la asignación Y LOS RECURSOS asociados
     const { data: asignacion, error } = await clienteSupabase
         .from('asignaciones_rutinas')
-        .select(`
-            rutina_id, 
-            rutinas(*),
-            receta:recurso_receta_id ( nombre, archivo_url, tipo ),
-            sugerencia:recurso_sugerencia_id ( nombre, archivo_url, tipo )
-        `)
+        .select(`rutina_id, rutinas(*), receta:recurso_receta_id ( nombre, archivo_url, tipo ), sugerencia:recurso_sugerencia_id ( nombre, archivo_url, tipo )`)
         .eq('cliente_id', user.id)
         .eq('activa', true)
         .single();
 
     if (error || !asignacion) {
         document.getElementById('contenedor-rutina').innerHTML = `
-            <div class="alert alert-warning text-center mt-5">
-                <h4>Sin asignación</h4>
+            <div class="alert alert-warning text-center mt-5 bg-dark border-warning text-warning">
+                <h4><i class="bi bi-exclamation-triangle"></i></h4>
                 <p>Tu entrenador aún no te ha asignado una rutina.</p>
             </div>`;
-        // Limpiar UI
         if (document.getElementById('titulo-seccion')) document.getElementById('titulo-seccion').innerText = "Bienvenido";
         document.getElementById('contenedor-botones-dias').innerHTML = "";
-        // Limpiamos recursos extra por si acaso
-        const atajos = document.getElementById('contenedor-recursos-extra');
-        if (atajos) atajos.innerHTML = "";
         return;
     }
 
     const rutina = asignacion.rutinas;
-    // Actualizamos título si existe el elemento nuevo
-    if (document.getElementById('titulo-seccion')) {
-        document.getElementById('titulo-seccion').innerText = rutina.nombre; // O dejar fijo "Mi Rutina"
-    }
+    if (document.getElementById('titulo-seccion')) document.getElementById('titulo-seccion').innerText = rutina.nombre;
 
-    // --- RENDERIZAR PESTAÑA RECURSOS (Solo en la pestaña, no arriba) ---
+    // --- RECURSOS ---
     const contenedorRecursos = document.getElementById('lista-recursos');
     contenedorRecursos.innerHTML = "";
-
     const recursos = [];
     if (asignacion.receta) recursos.push(asignacion.receta);
     if (asignacion.sugerencia) recursos.push(asignacion.sugerencia);
@@ -171,7 +146,7 @@ async function cargarRutinaActiva() {
             const color = r.tipo === 'receta' ? 'text-success' : 'text-warning';
             const border = r.tipo === 'receta' ? 'border-success' : 'border-warning';
 
-            const cardHtml = `
+            contenedorRecursos.innerHTML += `
                 <div class="col-12 col-md-6 animate__animated animate__fadeIn">
                     <div class="card bg-dark-subtle border-start border-4 ${border} shadow-sm" 
                          onclick="abrirVisor('${r.archivo_url}', '${r.nombre}')" style="cursor: pointer;">
@@ -186,24 +161,18 @@ async function cargarRutinaActiva() {
                             <i class="bi bi-chevron-right text-secondary ms-auto"></i>
                         </div>
                     </div>
-                </div>
-            `;
-            contenedorRecursos.innerHTML += cardHtml;
-
-            // NOTA: Aquí eliminamos la parte que inyectaba botones en 'contenedorAtajos'
+                </div>`;
         });
     } else {
         contenedorRecursos.innerHTML = '<div class="text-center text-muted mt-5"><i class="bi bi-folder-x fs-1"></i><p>No hay recursos.</p></div>';
     }
 
-    // 2. Cargar Días de la Rutina
     cargarBotonesDias(rutina.id);
 }
 
 
 async function cargarBotonesDias(rutinaId) {
     const contenedorBtn = document.getElementById('contenedor-botones-dias');
-
     const { data: dias, error } = await clienteSupabase
         .from('rutinas_dias')
         .select('*')
@@ -222,76 +191,50 @@ async function cargarBotonesDias(rutinaId) {
     });
 
     contenedorBtn.innerHTML = "";
-
     diasUnicos.forEach((dia, index) => {
         const btn = document.createElement('button');
         const claseColor = index === 0 ? 'btn-warning fw-bold' : 'btn-outline-secondary';
-
         btn.className = `btn ${claseColor} flex-shrink-0 px-4`;
         btn.innerText = `Día ${dia.dia_numero}`;
-
         btn.onclick = () => {
-            document.querySelectorAll('#contenedor-botones-dias button').forEach(b => {
-                b.className = 'btn btn-outline-secondary flex-shrink-0 px-4';
-            });
+            document.querySelectorAll('#contenedor-botones-dias button').forEach(b => b.className = 'btn btn-outline-secondary flex-shrink-0 px-4');
             btn.className = 'btn btn-warning fw-bold flex-shrink-0 px-4';
             cargarEjerciciosDelDia(dia.id);
         };
-
         contenedorBtn.appendChild(btn);
     });
 
-    if (diasUnicos.length > 0) {
-        cargarEjerciciosDelDia(diasUnicos[0].id);
-    }
+    if (diasUnicos.length > 0) cargarEjerciciosDelDia(diasUnicos[0].id);
 }
 
 // ==========================================
-//      MÓDULO PROGRESO (HISTORIAL COMPLETO)
+//      MÓDULO PROGRESO (HISTORIAL)
 // ==========================================
 
 async function cargarModuloProgreso() {
     const contenedor = document.getElementById('lista-historial-ejercicios');
     contenedor.innerHTML = '<div class="text-center mt-5"><div class="spinner-border text-warning"></div></div>';
-
     const { data: { user } } = await clienteSupabase.auth.getUser();
 
-    // 1. Traemos TODO el historial, pero solo necesitamos saber QUÉ ejercicios hay
-    // Usamos select con la relación al catálogo para saber el nombre
     const { data: historial, error } = await clienteSupabase
         .from('historial_usuario')
-        .select(`
-            ejercicio_id,
-            ejercicios_catalogo ( nombre )
-        `)
+        .select(`ejercicio_id, ejercicios_catalogo ( nombre )`)
         .eq('usuario_id', user.id);
 
     if (error || !historial || historial.length === 0) {
-        contenedor.innerHTML = '<div class="alert alert-dark text-center text-muted">Aún no has registrado datos.</div>';
+        contenedor.innerHTML = '<div class="alert alert-dark text-center text-muted border-secondary">Aún no has registrado datos.</div>';
         return;
     }
 
-    // 2. Filtrar ÚNICOS (Porque el historial tiene miles de filas repetidas del mismo ejercicio)
     const ejerciciosUnicos = {};
-    
     historial.forEach(item => {
-        // Si tiene catálogo y nombre
-        if (item.ejercicios_catalogo) {
-            const id = item.ejercicio_id;
-            const nombre = item.ejercicios_catalogo.nombre;
-            // Lo guardamos en un objeto para evitar duplicados automáticamente
-            ejerciciosUnicos[id] = nombre;
-        }
+        if (item.ejercicios_catalogo) ejerciciosUnicos[item.ejercicio_id] = item.ejercicios_catalogo.nombre;
     });
 
-    // 3. Renderizar la lista
     contenedor.innerHTML = "";
-    
-    // Recorremos las claves del objeto (IDs)
     Object.keys(ejerciciosUnicos).forEach(id => {
         const nombre = ejerciciosUnicos[id];
-        
-        const itemHtml = `
+        contenedor.innerHTML += `
             <div class="card bg-dark border-secondary shadow-sm" onclick="abrirGrafico(${id}, '${nombre}')">
                 <div class="card-body py-3 d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3">
@@ -302,14 +245,8 @@ async function cargarModuloProgreso() {
                     </div>
                     <i class="bi bi-chevron-right text-secondary"></i>
                 </div>
-            </div>
-        `;
-        contenedor.innerHTML += itemHtml;
+            </div>`;
     });
-
-    if (Object.keys(ejerciciosUnicos).length === 0) {
-        contenedor.innerHTML = '<div class="alert alert-info text-center">No se encontraron ejercicios.</div>';
-    }
 }
 
 
@@ -319,8 +256,29 @@ async function cargarModuloProgreso() {
 
 async function cargarEjerciciosDelDia(diaId) {
     const contenedor = document.getElementById('contenedor-rutina');
-    contenedor.innerHTML = '<div class="text-center mt-5"><div class="spinner-border text-warning"></div></div>';
+    
+    // 1. MOSTRAR SKELETON (Mientras carga)
+    // Creamos 3 tarjetas falsas para dar sensación de contenido
+    let skeletonHTML = '';
+    for(let i=0; i<3; i++) {
+        skeletonHTML += `
+            <div class="card card-ejercicio p-3 animate__animated animate__fadeIn">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="skeleton skeleton-title"></div>
+                    <div class="skeleton" style="width: 30px; height: 30px; border-radius: 50%;"></div>
+                </div>
+                <div class="skeleton skeleton-img"></div>
+                <div class="row mt-3">
+                    <div class="col-5"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width: 50%"></div></div>
+                    <div class="col-5"><div class="skeleton skeleton-btn ms-auto"></div></div>
+                    <div class="col-2"><div class="skeleton" style="width: 30px; height: 30px;"></div></div>
+                </div>
+            </div>
+        `;
+    }
+    contenedor.innerHTML = skeletonHTML;
 
+    // 2. PEDIR DATOS REALES
     const { data: ejercicios, error: errorRutina } = await clienteSupabase
         .from('rutinas_detalles')
         .select(`*, ejercicios_catalogo ( nombre, imagen_url )`)
@@ -330,9 +288,11 @@ async function cargarEjerciciosDelDia(diaId) {
 
     if (errorRutina) {
         contenedor.innerHTML = '<div class="alert alert-danger">Error al cargar ejercicios.</div>';
+        Toast.fire({ icon: 'error', title: 'Error de conexión' });
         return;
     }
 
+    // 3. CARGAR DATOS REALES (Resto igual que antes)
     const hoy = obtenerFechaLocal();
     const { data: { user } } = await clienteSupabase.auth.getUser();
 
@@ -380,7 +340,7 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
             html += `
                 <div class="card card-ejercicio p-3 animate__animated animate__fadeIn">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h4 class="m-0 text-white" style="max-width: 75%;">${nombreEjercicio}</h4>
+                        <h4 class="m-0 text-white fw-bold" style="max-width: 75%; font-size: 1.1rem;">${nombreEjercicio}</h4>
                         
                         <div class="d-flex align-items-center gap-2">
                             <button class="btn btn-sm btn-dark border-secondary text-warning" 
@@ -396,7 +356,7 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
             `;
         }
 
-        // --- FILA SERIE ---
+        // --- FILA SERIE (CORREGIDA LA SEPARACIÓN INPUT / KG) ---
         const esCalentamiento = fila.tipo_serie === 'calentamiento';
         const badgeColor = esCalentamiento ? 'bg-secondary' : 'bg-success';
         const textoSerie = fila.tipo_serie ? fila.tipo_serie.toUpperCase() : 'TRABAJO';
@@ -407,18 +367,20 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
             <div class="row fila-serie align-items-center">
                 <div class="col-5">
                     <span class="badge ${badgeColor} mb-1" style="font-size: 0.65em;">${textoSerie}</span>
-                    <div class="fw-bold fs-5">${fila.reps_objetivo} <span class="fs-6 fw-normal text-muted">reps</span></div>
+                    <div class="fw-bold fs-5 text-white">${fila.reps_objetivo} <span class="fs-6 fw-normal text-secondary">reps</span></div>
                     ${htmlObservacionFila}
                 </div>
-                <div class="col-4 text-end">
-                    <div class="input-group input-group-sm">
-                        <input type="number" class="form-control input-peso" placeholder="0" value="${pesoPrevio}" 
+                
+                <div class="col-5">
+                    <div class="d-flex align-items-center justify-content-end gap-2"> <input type="number" class="form-control input-peso" placeholder="0" value="${pesoPrevio}" 
+                               style="width: 70px;"
                                onchange="guardarProgreso(${fila.id}, ${fila.ejercicio_id}, 'peso', this.value)">
-                        <span class="input-group-text bg-dark text-secondary border-secondary">kg</span>
+                        <span class="badge-kg">kg</span>
                     </div>
                 </div>
-                <div class="col-3 text-end">
-                    <input type="checkbox" class="form-check-input border-secondary bg-dark" style="width: 28px; height: 28px;"
+                
+                <div class="col-2 text-end">
+                    <input type="checkbox" class="form-check-input ms-auto"
                            ${estaCompletado} onchange="guardarProgreso(${fila.id}, ${fila.ejercicio_id}, 'check', this.checked)">
                 </div>
             </div>
@@ -429,10 +391,12 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
     contenedor.innerHTML = html;
 }
 
+// GUARDAR PROGRESO (MEJORADO: Silent Success, Loud Failure)
 async function guardarProgreso(detalleId, ejercicioId, tipo, valor) {
     const { data: { user } } = await clienteSupabase.auth.getUser();
     const hoy = obtenerFechaLocal();
     const datosUpsert = { usuario_id: user.id, ejercicio_id: ejercicioId, fecha_entrenamiento: hoy };
+    
     if (detalleId) datosUpsert.rutina_detalle_id = detalleId;
     if (tipo === 'peso') datosUpsert.peso_real = valor;
     if (tipo === 'check') datosUpsert.completado = valor;
@@ -440,7 +404,17 @@ async function guardarProgreso(detalleId, ejercicioId, tipo, valor) {
     const { error } = await clienteSupabase
         .from('historial_usuario')
         .upsert(datosUpsert, { onConflict: 'usuario_id, ejercicio_id, fecha_entrenamiento' });
-    if (error) console.error("Error guardando:", error);
+        
+    if (error) {
+        console.error("Error guardando:", error);
+        // Aquí SÍ mostramos alerta porque el usuario piensa que guardó y no fue así
+        Toast.fire({
+            icon: 'error',
+            title: 'No se guardó',
+            text: 'Revisa tu conexión a internet.'
+        });
+    }
+    // Si es éxito, NO mostramos nada para no interrumpir el entrenamiento (UX Fluida)
 }
 
 
@@ -475,16 +449,15 @@ async function abrirGrafico(ejercicioId, nombre) {
         .from('historial_usuario')
         .select('fecha_entrenamiento, peso_real')
         .eq('usuario_id', user.id)
-        .eq('ejercicio_id', ejercicioId) // <--- ESTO DEBE DECIR 'ejercicio_id'
+        .eq('ejercicio_id', ejercicioId)
         .gt('peso_real', 0)
         .order('fecha_entrenamiento', { ascending: true })
         .limit(20);
 
-    // 3. Preparar datos para el gráfico
-    const etiquetas = historial.map(h => {
-        const partes = h.fecha_entrenamiento.split('-'); // YYYY-MM-DD
-        return `${partes[2]}/${partes[1]}`; // Retorna DD/MM
-    });
+    const etiquetas = historial ? historial.map(h => {
+        const partes = h.fecha_entrenamiento.split('-'); 
+        return `${partes[2]}/${partes[1]}`; 
+    }) : [];
     const valores = historial ? historial.map(h => h.peso_real) : [];
 
     const ctx = document.getElementById('miGrafico').getContext('2d');
@@ -547,7 +520,6 @@ function resetTimer() {
     document.getElementById('timer-display').innerText = "00:00";
 }
 
-// INICIAR
 document.addEventListener('DOMContentLoaded', () => {
     verificarSesion();
 });

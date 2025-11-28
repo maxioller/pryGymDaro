@@ -9,3 +9,34 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const clienteSupabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 console.log("✅ Conexión con Supabase inicializada");
+
+// 1. Configuración para TOASTS (Notificaciones pequeñas en la esquina)
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+    background: '#1e2126', // Tu color de tarjetas
+    color: '#fff',         // Texto blanco
+    iconColor: '#ffc107',  // Iconos amarillos
+    didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+    }
+});
+
+// 2. Configuración para POPUPS (Ventanas de confirmar borrar, etc)
+const Popup = Swal.mixin({
+    background: '#1e2126',
+    color: '#fff',
+    confirmButtonColor: '#ffc107', // Tu amarillo
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Sí, confirmar',
+    cancelButtonText: 'Cancelar',
+    customClass: {
+        confirmButton: 'btn btn-warning fw-bold text-dark mx-2',
+        cancelButton: 'btn btn-outline-secondary mx-2'
+    },
+    buttonsStyling: false // Para usar tus clases Bootstrap
+});

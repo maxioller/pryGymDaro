@@ -3,12 +3,14 @@
 let esRegistro = false; // Estado inicial: Login
 
 const formulario = document.getElementById('form-login');
+// Nota: Ya no necesitamos el elemento 'mensaje-feedback' para mostrar errores, 
+// pero lo dejo declarado por si lo usas en otra cosa, aunque SweetAlert lo reemplaza.
 const mensajeFeedback = document.getElementById('mensaje-feedback');
 
 // Función para cambiar entre Login y Registro
 function alternarModo() {
     esRegistro = !esRegistro;
-    mensajeFeedback.classList.add('d-none'); // Limpiar errores
+    if(mensajeFeedback) mensajeFeedback.classList.add('d-none'); // Limpiar errores viejos si quedan
 
     if (esRegistro) {
         // MODO REGISTRO
@@ -42,7 +44,7 @@ formulario.addEventListener('submit', async (e) => {
     
     btnTexto.classList.add('d-none');
     btnSpinner.classList.remove('d-none');
-    mensajeFeedback.classList.add('d-none');
+    if(mensajeFeedback) mensajeFeedback.classList.add('d-none');
 
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
@@ -64,21 +66,22 @@ formulario.addEventListener('submit', async (e) => {
 
             if (error) throw error;
 
-            // Éxito en registro
-            mensajeFeedback.classList.remove('alert-danger', 'd-none');
-            mensajeFeedback.classList.add('alert-success');
-            mensajeFeedback.textContent = "¡Cuenta creada! Ya puedes iniciar sesión.";
+            // EXITO EN REGISTRO (CON SWEETALERT)
+            Toast.fire({
+                icon: 'success',
+                title: '¡Bienvenido!',
+                text: 'Cuenta creada con éxito. Redirigiendo...'
+            });
             
             // Volvemos al modo login automáticamente después de 2 segundos
             setTimeout(() => {
                 alternarModo();
                 document.getElementById('email').value = email; // Dejamos el email puesto
                 document.getElementById('password').value = "";
-                mensajeFeedback.classList.add('d-none');
             }, 2000);
 
         } else {
-            // === LOGICA DE LOGIN (La que ya tenías) ===
+            // === LOGICA DE LOGIN ===
             const { data, error } = await clienteSupabase.auth.signInWithPassword({
                 email: email,
                 password: password,
@@ -96,18 +99,32 @@ formulario.addEventListener('submit', async (e) => {
 
             if (errorPerfil) throw errorPerfil;
 
-            if (perfil.rol === 'entrenador') {
-                window.location.href = 'admin.html';
-            } else {
-                window.location.href = 'app.html';
-            }
+            // Toast opcional de bienvenida al loguearse
+            Toast.fire({
+                icon: 'success',
+                title: 'Sesión iniciada'
+            });
+
+            // Pequeña demora para que se vea el Toast antes de cambiar de página
+            setTimeout(() => {
+                if (perfil.rol === 'entrenador') {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'app.html';
+                }
+            }, 1000);
         }
 
     } catch (error) {
         console.error(error);
-        mensajeFeedback.classList.remove('alert-success', 'd-none');
-        mensajeFeedback.classList.add('alert-danger');
-        mensajeFeedback.textContent = error.message || "Ocurrió un error inesperado.";
+        
+        // ERROR GENERAL (CON SWEETALERT)
+        Toast.fire({
+            icon: 'error',
+            title: 'Ups, algo falló',
+            text: error.message || "Ocurrió un error inesperado."
+        });
+
     } finally {
         // Restaurar botones
         btnTexto.classList.remove('d-none');
@@ -120,15 +137,18 @@ async function loginConGoogle() {
     const { data, error } = await clienteSupabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-            // Redirige a la página de inicio tras el login exitoso
-            // Como usas Live Server, esto debería funcionar automático,
-            // pero si falla, Google te devolverá a la URL que configuraste.
             redirectTo: window.location.origin + '/app.html' 
         }
     });
 
     if (error) {
         console.error("Error Google:", error);
-        alert("No se pudo iniciar con Google");
+        
+        // ERROR GOOGLE (CON SWEETALERT)
+        Toast.fire({
+            icon: 'error',
+            title: 'Error de acceso',
+            text: error.message || 'No se pudo conectar con Google'
+        });
     }
 }

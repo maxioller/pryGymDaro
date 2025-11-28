@@ -1,49 +1,121 @@
-/* css/login.css */
+/* css/login.css - GLASSMORPHISM EDITION */
 
 body {
-    background-color: #121418; /* Fondo oscuro global */
-    height: 100vh; /* Ocupa toda la altura de la pantalla */
-    display: flex; /* Flexbox para centrar todo */
-    align-items: center; /* Centrado vertical */
-    justify-content: center; /* Centrado horizontal */
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* 1. Imagen de fondo de alta calidad (Gimnasio oscuro) */
+    background: url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1470&auto=format&fit=crop') no-repeat center center fixed;
+    background-size: cover;
+    
+    /* 2. Superposición oscura para que se lea el texto */
+    position: relative;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0;
+}
+
+/* Capa oscura (Overlay) encima de la foto para mejorar contraste */
+body::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75); /* Oscuridad al 75% */
+    z-index: -1;
 }
 
 .card-login {
-    background-color: #1e2126; /* Un tono más claro que el fondo */
-    border: 1px solid #2c3035;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5); /* Sombra suave */
+    /* 3. El Efecto Vidrio (Glassmorphism) */
+    background: rgba(30, 33, 38, 0.65); /* Color base semitransparente */
+    backdrop-filter: blur(12px);         /* Difuminado del fondo (Blur) */
+    -webkit-backdrop-filter: blur(12px); /* Soporte Safari */
+    
+    border: 1px solid rgba(255, 255, 255, 0.1); /* Borde sutil brillante */
+    border-top: 1px solid rgba(255, 255, 255, 0.2); /* Borde superior más luz */
+    
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8); /* Sombra profunda */
+    
     max-width: 400px;
-    width: 100%;
-    padding: 2rem;
+    width: 90%; /* Responsive: ocupa el 90% en celulares */
+    padding: 2.5rem;
+    position: relative;
+    overflow: hidden; /* Para efectos internos */
 }
 
-/* Botón amarillo personalizado */
+/* Decoración: Un brillo sutil en la esquina superior */
+.card-login::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+h2 { letter-spacing: -1px; }
+
+/* Botón amarillo principal mejorado */
 .btn-ingresar {
-    background-color: #ffc107;
+    background: #ffc107;
+    background: linear-gradient(45deg, #ffc107, #ffdb4d); /* Degradado sutil */
     color: #000;
-    font-weight: bold;
+    font-weight: 800;
     border: none;
-    transition: all 0.3s ease; /* Animación suave al pasar el mouse */
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4); /* Resplandor amarillo */
+    transition: all 0.3s ease;
 }
 
 .btn-ingresar:hover {
-    background-color: #e0a800; /* Se oscurece un poco al hover */
-    transform: scale(1.02); /* Crece un poquito */
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 193, 7, 0.6);
 }
 
-/* Inputs oscuros */
+.btn-ingresar:active {
+    transform: scale(0.98);
+}
+
+/* Inputs con estilo transparente */
 .form-control {
-    background-color: #2b3035;
-    border: 1px solid #495057;
-    color: white;
+    background-color: rgba(0, 0, 0, 0.4) !important; /* Más oscuro y transparente */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white !important;
+    padding: 12px;
+    border-radius: 10px;
+    transition: all 0.3s;
 }
 
-/* Al hacer clic en el input */
 .form-control:focus {
-    background-color: #2b3035;
-    border-color: #ffc107; /* Borde amarillo al escribir */
+    background-color: rgba(0, 0, 0, 0.6) !important;
+    border-color: #ffc107;
+    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.15); /* Ring amarillo suave */
+}
+
+/* Placeholder color */
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Botón Google y otros */
+.btn-light {
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    color: #333;
+}
+.btn-light:hover {
+    background: #fff;
+}
+
+/* Botón de "Volver" flotante */
+.btn-outline-secondary {
+    border-color: rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7);
+}
+.btn-outline-secondary:hover {
+    background: rgba(255,255,255,0.1);
     color: white;
-    box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25); /* Resplandor amarillo */
+    border-color: white;
 }
