@@ -1,4 +1,4 @@
-// js/admin.js
+// js/admin.js - VERSIÓN FINAL OPTIMIZADA Y COMPLETA
 
 // ==========================================
 //      1. SEGURIDAD Y NAVEGACIÓN
@@ -14,7 +14,6 @@ async function verificarAdmin() {
 }
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
-    // Confirmación elegante antes de salir
     const result = await Popup.fire({
         title: '¿Cerrar sesión?',
         text: "Volverás a la pantalla de ingreso.",
@@ -41,7 +40,7 @@ function cambiarVista(vista) {
         if(btn) btn.className = 'nav-link text-white link-opacity-75-hover';
     });
 
-    // 3. Mostrar selección
+    // 3. Mostrar selección y activar botón
     if (vista === 'ejercicios') {
         document.getElementById('vista-ejercicios').classList.remove('d-none');
         document.getElementById('btn-nav-ejercicios').className = 'nav-link active bg-warning text-dark fw-bold';
@@ -64,16 +63,15 @@ function cambiarVista(vista) {
 
 
 // ==========================================
-//      2. GESTIÓN DE EJERCICIOS (CRUD)
+//      2. GESTIÓN DE EJERCICIOS (CRUD + SKELETON)
 // ==========================================
 
-let idEjercicioEnEdicion = null; // Variable para saber si estamos editando
+let idEjercicioEnEdicion = null; 
 
 async function cargarEjercicios() {
     const tbody = document.getElementById('tabla-ejercicios');
     
-    // 1. SKELETON ROWS
-    // Generamos 5 filas falsas con bloques grises
+    // 1. SKELETON ROWS (Efecto de carga visual)
     let skeletonHTML = '';
     for(let i=0; i<5; i++) {
         skeletonHTML += `
@@ -82,14 +80,11 @@ async function cargarEjercicios() {
                 <td><div class="skeleton skeleton-title mb-0"></div></td>
                 <td><div class="skeleton skeleton-btn" style="width: 60px;"></div></td>
                 <td class="text-end"><div class="d-flex justify-content-end gap-2"><div class="skeleton skeleton-btn" style="width: 35px;"></div><div class="skeleton skeleton-btn" style="width: 35px;"></div></div></td>
-            </tr>
-        `;
+            </tr>`;
     }
     tbody.innerHTML = skeletonHTML;
 
-    // 2. FETCH REAL
-    // Hacemos un pequeño delay artificial (300ms) para que se aprecie la animación 
-    // y no sea un parpadeo molesto si el internet es muy rápido.
+    // Pequeño delay artificial para apreciar la animación (UX)
     await new Promise(r => setTimeout(r, 300)); 
 
     const { data: ejercicios, error } = await clienteSupabase
@@ -106,7 +101,8 @@ async function cargarEjercicios() {
     ejercicios.forEach(ej => {
         const imgUrl = ej.imagen_url || 'https://placehold.co/50x50/333/FFF?text=?';
         const fila = `
-            <tr class="animate__animated animate__fadeIn"> <td>
+            <tr class="animate__animated animate__fadeIn">
+                <td>
                     <img src="${imgUrl}" class="thumb-ejercicio" alt="img" onerror="this.src='https://placehold.co/50x50/333/FFF?text=Error'">
                 </td>
                 <td class="fw-bold text-white">${ej.nombre}</td>
@@ -119,8 +115,7 @@ async function cargarEjercicios() {
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
-            </tr>
-        `;
+            </tr>`;
         tbody.innerHTML += fila;
     });
 }
@@ -145,13 +140,9 @@ async function prepararEdicionEjercicio(id) {
     document.getElementById('urlImagen').value = ejercicio.imagen_url || "";
 
     idEjercicioEnEdicion = id;
-
-    const modalElement = document.getElementById('modalNuevoEjercicio');
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
+    new bootstrap.Modal(document.getElementById('modalNuevoEjercicio')).show();
 }
 
-// GUARDAR EJERCICIO (Updated with SweetAlert)
 async function guardarEjercicio() {
     const nombre = document.getElementById('nombreEjercicio').value;
     const grupo = document.getElementById('grupoMuscular').value;
@@ -160,7 +151,7 @@ async function guardarEjercicio() {
 
     if (!nombre) return Toast.fire({ icon: 'warning', title: 'Falta el nombre' });
 
-    // A. SI HAY UN ARCHIVO SELECCIONADO
+    // Lógica de subida de imagen
     if (inputArchivo.files.length > 0) {
         const archivo = inputArchivo.files[0];
         const estado = document.getElementById('estado-subida');
@@ -169,35 +160,25 @@ async function guardarEjercicio() {
         const extension = archivo.name.split('.').pop();
         const nombreArchivo = `${Date.now()}_${nombre.replace(/\s+/g, '')}.${extension}`;
 
-        const { error: errorSubida } = await clienteSupabase
-            .storage
-            .from('ejercicios') 
-            .upload(nombreArchivo, archivo);
-
+        const { error: errorSubida } = await clienteSupabase.storage.from('ejercicios').upload(nombreArchivo, archivo);
         if (errorSubida) {
             Toast.fire({ icon: 'error', title: 'Error subiendo imagen', text: errorSubida.message });
             estado.classList.add('d-none');
             return;
         }
 
-        const { data: urlData } = clienteSupabase.storage
-            .from('ejercicios')
-            .getPublicUrl(nombreArchivo);
-            
+        const { data: urlData } = clienteSupabase.storage.from('ejercicios').getPublicUrl(nombreArchivo);
         urlFinal = urlData.publicUrl;
         estado.classList.add('d-none');
     }
 
-    // B. GUARDAR DATOS EN LA BASE DE DATOS
     const payload = { nombre: nombre, grupo_muscular: grupo, imagen_url: urlFinal };
     let errorDB;
 
     if (idEjercicioEnEdicion) {
-        // UPDATE
         const { error } = await clienteSupabase.from('ejercicios_catalogo').update(payload).eq('id', idEjercicioEnEdicion);
         errorDB = error;
     } else {
-        // INSERT
         const { error } = await clienteSupabase.from('ejercicios_catalogo').insert([payload]);
         errorDB = error;
     }
@@ -205,22 +186,16 @@ async function guardarEjercicio() {
     if (errorDB) {
         Toast.fire({ icon: 'error', title: 'Error DB', text: errorDB.message });
     } else {
-        // ÉXITO
         const el = document.getElementById('modalNuevoEjercicio');
         const modal = bootstrap.Modal.getInstance(el); 
         if(modal) modal.hide();
         
         document.getElementById('form-nuevo-ejercicio').reset();
         cargarEjercicios();
-        
-        Toast.fire({
-            icon: 'success',
-            title: idEjercicioEnEdicion ? 'Ejercicio actualizado' : 'Ejercicio creado'
-        });
+        Toast.fire({ icon: 'success', title: idEjercicioEnEdicion ? 'Ejercicio actualizado' : 'Ejercicio creado' });
     }
 }
 
-// BORRAR EJERCICIO (Updated with SweetAlert Popup)
 async function borrarEjercicio(id) {
     const result = await Popup.fire({
         title: '¿Borrar ejercicio?',
@@ -231,13 +206,8 @@ async function borrarEjercicio(id) {
 
     if (!result.isConfirmed) return;
 
-    // 1. Obtener imagen para borrarla del storage
-    const { data: ejercicio } = await clienteSupabase
-        .from('ejercicios_catalogo')
-        .select('imagen_url')
-        .eq('id', id)
-        .single();
-
+    // Intentamos borrar la imagen del storage si existe
+    const { data: ejercicio } = await clienteSupabase.from('ejercicios_catalogo').select('imagen_url').eq('id', id).single();
     if (ejercicio && ejercicio.imagen_url && ejercicio.imagen_url.includes('supabase')) {
         try {
             const nombreArchivo = ejercicio.imagen_url.split('/').pop();
@@ -245,12 +215,10 @@ async function borrarEjercicio(id) {
         } catch (e) { console.error(e); }
     }
 
-    // 2. Borrar registro
     const { error } = await clienteSupabase.from('ejercicios_catalogo').delete().eq('id', id);
 
-    if (error) {
-        Toast.fire({ icon: 'error', title: 'Error al borrar', text: error.message });
-    } else {
+    if (error) Toast.fire({ icon: 'error', title: 'Error al borrar', text: error.message });
+    else {
         cargarEjercicios();
         Toast.fire({ icon: 'success', title: 'Ejercicio eliminado' });
     }
@@ -258,55 +226,37 @@ async function borrarEjercicio(id) {
 
 
 // ==========================================
-//      3. GESTIÓN DE RUTINAS (LISTADO)
+//      3. GESTIÓN DE RUTINAS
 // ==========================================
 
 async function cargarRutinas() {
     const tbody = document.getElementById('tabla-rutinas');
     tbody.innerHTML = '<tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-warning"></div></td></tr>';
 
-    const { data: rutinas, error } = await clienteSupabase
-        .from('rutinas')
-        .select('*')
-        .order('id', { ascending: false });
+    const { data: rutinas, error } = await clienteSupabase.from('rutinas').select('*').order('id', { ascending: false });
 
-    if (error) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-danger text-center">Error al cargar rutinas</td></tr>';
-        return;
-    }
+    if (error) return tbody.innerHTML = '<tr><td colspan="4" class="text-danger text-center">Error al cargar rutinas</td></tr>';
 
     tbody.innerHTML = '';
-    if (rutinas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No hay rutinas creadas.</td></tr>';
-        return;
-    }
+    if (rutinas.length === 0) return tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No hay rutinas creadas.</td></tr>';
 
     rutinas.forEach(rutina => {
         const etiquetaTipo = '<span class="badge bg-info text-dark">Plantilla</span>';
-
         const fila = `
             <tr>
                 <td class="fw-bold text-white">${rutina.nombre}</td>
                 <td>${etiquetaTipo}</td>
                 <td>${rutina.nivel_dias} días</td>
                 <td class="text-end">
-                    <button class="btn btn-sm btn-outline-info me-1" onclick="previsualizarRutina(${rutina.id})" title="Ver como cliente">
-                        <i class="bi bi-eye"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-warning me-1" onclick="editarRutina(${rutina.id})">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="borrarRutina(${rutina.id})">
-                        <i class="bi bi-trash"></i>
-                    </button>
+                    <button class="btn btn-sm btn-outline-info me-1" onclick="previsualizarRutina(${rutina.id})" title="Ver como cliente"><i class="bi bi-eye"></i></button>
+                    <button class="btn btn-sm btn-outline-warning me-1" onclick="editarRutina(${rutina.id})"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="borrarRutina(${rutina.id})"><i class="bi bi-trash"></i></button>
                 </td>
-            </tr>
-        `;
+            </tr>`;
         tbody.innerHTML += fila;
     });
 }
 
-// BORRAR RUTINA (Updated with SweetAlert)
 async function borrarRutina(id) {
     const result = await Popup.fire({
         title: '¿Eliminar rutina?',
@@ -318,10 +268,8 @@ async function borrarRutina(id) {
     if (!result.isConfirmed) return;
 
     const { error } = await clienteSupabase.from('rutinas').delete().eq('id', id);
-
-    if (error) {
-        Toast.fire({ icon: 'error', title: 'Error', text: error.message });
-    } else {
+    if (error) Toast.fire({ icon: 'error', title: 'Error', text: error.message });
+    else {
         cargarRutinas(); 
         Toast.fire({ icon: 'success', title: 'Rutina eliminada' });
     }
@@ -329,7 +277,7 @@ async function borrarRutina(id) {
 
 
 // ==========================================
-//      4. CONSTRUCTOR DE RUTINAS
+//      4. CONSTRUCTOR DE RUTINAS (LÓGICA PRINCIPAL)
 // ==========================================
 
 let rutinaTemporal = { nombre: "", dias: { 1: [] }, diaSeleccionado: 1 };
@@ -339,12 +287,9 @@ function abrirConstructor() {
     cambiarVista('crear-rutina');
     document.getElementById('nombreNuevaRutina').value = "";
     document.getElementById('descripcionRutina').value = "";
-    
     rutinaTemporal = { nombre: "", dias: { 1: [] }, diaSeleccionado: 1 };
     idRutinaEnEdicion = null; 
-    
     document.querySelector('#vista-crear-rutina .btn-success').innerHTML = '<i class="bi bi-save me-1"></i> Guardar Rutina';
-
     renderizarTabs(); 
     cargarCatalogoLateral();
     renderizarDiaActual();
@@ -353,18 +298,11 @@ function abrirConstructor() {
 async function editarRutina(id) {
     cambiarVista('crear-rutina');
     idRutinaEnEdicion = id; 
-    
     const btnGuardar = document.querySelector('#vista-crear-rutina .btn-success');
     btnGuardar.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Cargando...';
     btnGuardar.disabled = true;
 
-    // 1. Cargar Cabecera
-    const { data: rutina, error: errorHeader } = await clienteSupabase
-        .from('rutinas')
-        .select('*')
-        .eq('id', id)
-        .single();
-
+    const { data: rutina, error: errorHeader } = await clienteSupabase.from('rutinas').select('*').eq('id', id).single();
     if (errorHeader) {
         Toast.fire({ icon: 'error', title: 'Error', text: 'No se encontró la rutina' });
         cambiarVista('rutinas');
@@ -374,14 +312,12 @@ async function editarRutina(id) {
     document.getElementById('nombreNuevaRutina').value = rutina.nombre;
     document.getElementById('descripcionRutina').value = rutina.descripcion || "";
 
-    // 2. Cargar Detalles
     const { data: detalles } = await clienteSupabase
         .from('rutinas_detalles')
         .select(`*, rutinas_dias!inner ( dia_numero ), ejercicios_catalogo ( nombre )`)
         .eq('rutinas_dias.rutina_id', id)
         .order('orden_ejercicio', { ascending: true });
 
-    // 3. Reconstruir Objeto Temporal
     rutinaTemporal = { nombre: rutina.nombre, dias: {}, diaSeleccionado: 1 };
 
     if (detalles && detalles.length > 0) {
@@ -418,13 +354,9 @@ async function editarRutina(id) {
     btnGuardar.disabled = false;
 }
 
-// --- Helpers del Constructor ---
+// Helpers Constructor
 async function cargarCatalogoLateral() {
-    const { data: ejercicios } = await clienteSupabase
-        .from('ejercicios_catalogo')
-        .select('*')
-        .order('nombre');
-
+    const { data: ejercicios } = await clienteSupabase.from('ejercicios_catalogo').select('*').order('nombre');
     window.todosLosEjercicios = ejercicios;
     dibujarCatalogo(ejercicios);
 }
@@ -446,8 +378,7 @@ function dibujarCatalogo(lista) {
                     </div>
                 </div>
                 <i class="bi bi-plus-circle text-success fs-5"></i>
-            </div>
-        `;
+            </div>`;
         contenedor.innerHTML += html;
     });
 }
@@ -473,9 +404,7 @@ function agregarEjercicioAlDia(idEjercicio) {
         nota: ""
     };
 
-    if (!rutinaTemporal.dias[rutinaTemporal.diaSeleccionado]) {
-        rutinaTemporal.dias[rutinaTemporal.diaSeleccionado] = [];
-    }
+    if (!rutinaTemporal.dias[rutinaTemporal.diaSeleccionado]) rutinaTemporal.dias[rutinaTemporal.diaSeleccionado] = [];
     rutinaTemporal.dias[rutinaTemporal.diaSeleccionado].push(nuevoItem);
     renderizarDiaActual();
 }
@@ -486,15 +415,11 @@ function renderizarDiaActual() {
     const ejerciciosDelDia = rutinaTemporal.dias[dia] || [];
 
     if (ejerciciosDelDia.length === 0) {
-        contenedor.innerHTML = `<p class="text-muted text-center mt-5">
-            <i class="bi bi-arrow-left-circle fs-1 d-block mb-2"></i>
-            Selecciona ejercicios del menú izquierdo para agregarlos al Día ${dia}
-        </p>`;
+        contenedor.innerHTML = `<p class="text-muted text-center mt-5"><i class="bi bi-arrow-left-circle fs-1 d-block mb-2"></i>Selecciona ejercicios del menú izquierdo para agregarlos al Día ${dia}</p>`;
         return;
     }
 
     contenedor.innerHTML = "";
-
     ejerciciosDelDia.forEach((item, index) => {
         const selTrabajo = item.tipo === 'trabajo' ? 'selected' : '';
         const selCalentamiento = item.tipo === 'calentamiento' ? 'selected' : '';
@@ -502,24 +427,18 @@ function renderizarDiaActual() {
         const colorBorde = item.tipo === 'calentamiento' ? '#6c757d' : '#ffc107';
 
         const html = `
-            <div class="item-rutina p-3 mb-3 rounded shadow-sm animate__animated animate__fadeIn" 
-                 style="border-left: 4px solid ${colorBorde}">
-                
+            <div class="item-rutina p-3 mb-3 rounded shadow-sm animate__animated animate__fadeIn" style="border-left: 4px solid ${colorBorde}">
                 <div class="d-flex justify-content-between mb-2">
                     <div class="d-flex align-items-center gap-2">
                         <span class="badge bg-dark border border-secondary rounded-circle">${index + 1}</span>
                         <h6 class="fw-bold text-white mb-0">${item.nombre}</h6>
                     </div>
-                    <button class="btn btn-sm btn-outline-danger border-0 py-0" onclick="eliminarItem(${item.id_temp})">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
+                    <button class="btn btn-sm btn-outline-danger border-0 py-0" onclick="eliminarItem(${item.id_temp})"><i class="bi bi-x-lg"></i></button>
                 </div>
-                
                 <div class="row g-2">
                     <div class="col-3">
                         <label class="small text-secondary" style="font-size: 0.7rem;">TIPO</label>
-                        <select class="form-select input-compacto p-1" 
-                                onchange="actualizarItem(${item.id_temp}, 'tipo', this.value); renderizarDiaActual();">
+                        <select class="form-select input-compacto p-1" onchange="actualizarItem(${item.id_temp}, 'tipo', this.value); renderizarDiaActual();">
                             <option value="trabajo" ${selTrabajo}>Trabajo</option>
                             <option value="calentamiento" ${selCalentamiento}>Calentamiento</option>
                             <option value="fallo" ${selFallo}>Al Fallo</option>
@@ -527,22 +446,18 @@ function renderizarDiaActual() {
                     </div>
                     <div class="col-2">
                         <label class="small text-secondary" style="font-size: 0.7rem;">SERIES</label>
-                        <input type="text" class="form-control input-compacto text-center" value="${item.series}" 
-                            onchange="actualizarItem(${item.id_temp}, 'series', this.value)">
+                        <input type="text" class="form-control input-compacto text-center" value="${item.series}" onchange="actualizarItem(${item.id_temp}, 'series', this.value)">
                     </div>
                     <div class="col-2">
                         <label class="small text-secondary" style="font-size: 0.7rem;">REPS</label>
-                        <input type="text" class="form-control input-compacto text-center" value="${item.reps}" 
-                            onchange="actualizarItem(${item.id_temp}, 'reps', this.value)">
+                        <input type="text" class="form-control input-compacto text-center" value="${item.reps}" onchange="actualizarItem(${item.id_temp}, 'reps', this.value)">
                     </div>
                     <div class="col-5">
-                        <label class="small text-secondary" style="font-size: 0.7rem;">NOTA / PAUSA</label>
-                        <input type="text" class="form-control input-compacto" value="${item.nota}" placeholder="Ej: 75%"
-                            onchange="actualizarItem(${item.id_temp}, 'nota', this.value)">
+                        <label class="small text-secondary" style="font-size: 0.7rem;">NOTA</label>
+                        <input type="text" class="form-control input-compacto" value="${item.nota}" placeholder="Ej: 75%" onchange="actualizarItem(${item.id_temp}, 'nota', this.value)">
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
         contenedor.innerHTML += html;
     });
 }
@@ -565,21 +480,15 @@ function renderizarTabs() {
     const contenedor = document.getElementById('tabs-dias');
     const totalDias = Object.keys(rutinaTemporal.dias).length;
     const diaActual = rutinaTemporal.diaSeleccionado;
-
     contenedor.innerHTML = '';
     for (let i = 1; i <= totalDias; i++) {
         const isActive = i === diaActual;
         const clase = isActive ? 'btn-warning fw-bold active' : 'btn-outline-secondary';
         contenedor.innerHTML += `<button type="button" class="btn ${clase}" onclick="seleccionarDia(${i})">Día ${i}</button>`;
     }
-
     contenedor.innerHTML += `<button type="button" class="btn btn-outline-secondary" onclick="agregarDia()">+ Día</button>`;
-
     if (totalDias > 1) {
-        contenedor.innerHTML += `
-            <button type="button" class="btn btn-outline-danger ms-2" onclick="eliminarDiaActual()" title="Eliminar el Día ${diaActual}">
-                <i class="bi bi-trash"></i>
-            </button>`;
+        contenedor.innerHTML += `<button type="button" class="btn btn-outline-danger ms-2" onclick="eliminarDiaActual()"><i class="bi bi-trash"></i></button>`;
     }
 }
 
@@ -588,12 +497,7 @@ async function eliminarDiaActual() {
     const totalDias = Object.keys(rutinaTemporal.dias).length;
     if (totalDias <= 1) return Toast.fire({ icon: 'info', title: 'Mínimo un día requerido' });
     
-    const result = await Popup.fire({
-        title: `¿Borrar Día ${diaActual}?`,
-        text: "Se eliminarán los ejercicios de este día.",
-        icon: 'warning'
-    });
-
+    const result = await Popup.fire({ title: `¿Borrar Día ${diaActual}?`, icon: 'warning' });
     if (!result.isConfirmed) return;
 
     const nuevosDias = {};
@@ -606,7 +510,6 @@ async function eliminarDiaActual() {
     }
     rutinaTemporal.dias = nuevosDias;
     if (diaActual > Object.keys(nuevosDias).length) rutinaTemporal.diaSeleccionado = diaActual - 1;
-
     renderizarTabs();
     renderizarDiaActual();
 }
@@ -623,16 +526,13 @@ function eliminarItem(idTemp) {
     renderizarDiaActual();
 }
 
-
-// GUARDAR RUTINA COMPLETA (Updated with SweetAlert)
 async function guardarRutinaCompleta() {
     const nombre = document.getElementById('nombreNuevaRutina').value;
     const descripcion = document.getElementById('descripcionRutina').value;
 
-    if (!nombre) return Toast.fire({ icon: 'warning', title: 'Falta el nombre de la rutina' });
-    
+    if (!nombre) return Toast.fire({ icon: 'warning', title: 'Falta el nombre' });
     const diasConEjercicios = Object.values(rutinaTemporal.dias).some(lista => lista.length > 0);
-    if (!diasConEjercicios) return Toast.fire({ icon: 'warning', title: 'La rutina está vacía' });
+    if (!diasConEjercicios) return Toast.fire({ icon: 'warning', title: 'Rutina vacía' });
 
     const btnGuardar = document.querySelector('#vista-crear-rutina .btn-success');
     const textoOriginal = btnGuardar.innerHTML;
@@ -644,38 +544,27 @@ async function guardarRutinaCompleta() {
         let rutinaId = idRutinaEnEdicion; 
 
         if (rutinaId) {
-            // === UPDATE ===
             await clienteSupabase.from('rutinas').update({ 
                     nombre: nombre, 
                     descripcion: descripcion,
                     nivel_dias: Object.keys(rutinaTemporal.dias).length 
                 }).eq('id', rutinaId);
 
-            // Borrar estructura vieja
             const { data: diasViejos } = await clienteSupabase.from('rutinas_dias').select('id').eq('rutina_id', rutinaId);
             if (diasViejos.length > 0) {
                 const ids = diasViejos.map(d => d.id);
                 await clienteSupabase.from('rutinas_detalles').delete().in('dia_id', ids);
                 await clienteSupabase.from('rutinas_dias').delete().eq('rutina_id', rutinaId);
             }
-
         } else {
-            // === INSERT ===
-            const { data: nueva, error } = await clienteSupabase
-                .from('rutinas')
-                .insert([{
-                    nombre: nombre,
-                    descripcion: descripcion,
-                    es_plantilla: true,
-                    creador_id: user.id,
-                    nivel_dias: Object.keys(rutinaTemporal.dias).length
+            const { data: nueva, error } = await clienteSupabase.from('rutinas').insert([{
+                    nombre: nombre, descripcion: descripcion, es_plantilla: true,
+                    creador_id: user.id, nivel_dias: Object.keys(rutinaTemporal.dias).length
                 }]).select().single();
-            
             if(error) throw error;
             rutinaId = nueva.id;
         }
 
-        // === RE-INSERTAR DETALLES ===
         for (const numDia of Object.keys(rutinaTemporal.dias)) {
             const ejerciciosDelDia = rutinaTemporal.dias[numDia];
             if (ejerciciosDelDia.length === 0) continue;
@@ -684,19 +573,14 @@ async function guardarRutinaCompleta() {
                 .from('rutinas_dias')
                 .insert([{ rutina_id: rutinaId, dia_numero: parseInt(numDia), grupo_muscular_objetivo: 'General' }])
                 .select().single();
-
             if (errorDia) throw errorDia;
             
             let filasParaInsertar = [];
-            let contadorEjercicio = 0; 
-            let ultimoEjercicioId = null;
-            let contadorSerie = 1;
+            let contadorEjercicio = 0, ultimoEjercicioId = null, contadorSerie = 1;
 
             ejerciciosDelDia.forEach((item) => {
                 if (item.ejercicio_id !== ultimoEjercicioId) {
-                    contadorEjercicio++; 
-                    contadorSerie = 1;   
-                    ultimoEjercicioId = item.ejercicio_id;
+                    contadorEjercicio++; contadorSerie = 1; ultimoEjercicioId = item.ejercicio_id;
                 } 
                 const cantidadSeries = parseInt(item.series) || 1;
                 for (let i = 0; i < cantidadSeries; i++) {
@@ -705,64 +589,42 @@ async function guardarRutinaCompleta() {
                         ejercicio_id: item.ejercicio_id,
                         orden_ejercicio: contadorEjercicio, 
                         orden_serie: contadorSerie, 
-                        tipo_serie: item.tipo, 
-                        series_objetivo: item.series, 
-                        reps_objetivo: item.reps,
-                        observaciones: item.nota,
-                        descanso_info: 'N/A' 
+                        tipo_serie: item.tipo, series_objetivo: item.series, reps_objetivo: item.reps,
+                        observaciones: item.nota, descanso_info: 'N/A' 
                     });
                     contadorSerie++; 
                 }
             });
-
             const { error: errorDetalles } = await clienteSupabase.from('rutinas_detalles').insert(filasParaInsertar);
             if (errorDetalles) throw errorDetalles;
         }
 
         Swal.fire({
-            title: '¡Excelente!',
-            text: rutinaId ? 'Rutina actualizada correctamente.' : 'Rutina creada con éxito.',
-            icon: 'success',
-            background: '#1e2126',
-            color: '#fff',
-            confirmButtonColor: '#ffc107',
-            confirmButtonText: 'Genial'
+            title: '¡Excelente!', text: rutinaId ? 'Rutina actualizada.' : 'Rutina creada.',
+            icon: 'success', background: '#1e2126', color: '#fff', confirmButtonColor: '#ffc107', confirmButtonText: 'Genial'
         });
-
-        abrirConstructor(); 
-        cambiarVista('rutinas');
+        abrirConstructor(); cambiarVista('rutinas');
 
     } catch (error) {
         console.error("Error:", error);
         Toast.fire({ icon: 'error', title: 'Error al guardar', text: error.message });
     } finally {
-        btnGuardar.disabled = false;
-        btnGuardar.innerHTML = textoOriginal;
+        btnGuardar.disabled = false; btnGuardar.innerHTML = textoOriginal;
     }
 }
 
 // ==========================================
-//      5. GESTIÓN DE CLIENTES & ASIGNACIÓN
+//      5. CLIENTES & ASIGNACIÓN (CON AVATAR)
 // ==========================================
 
 async function cargarClientes() {
     const tbody = document.getElementById('tabla-clientes');
     tbody.innerHTML = '<tr><td colspan="3" class="text-center py-5"><div class="spinner-border text-warning"></div></td></tr>';
 
-    const { data: clientes, error } = await clienteSupabase
-        .from('perfiles')
-        .select('*')
-        .eq('rol', 'cliente');
+    const { data: clientes, error } = await clienteSupabase.from('perfiles').select('*').eq('rol', 'cliente');
+    if (error) return tbody.innerHTML = '<tr><td colspan="3" class="text-danger text-center">Error al cargar clientes</td></tr>';
 
-    if (error) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-danger text-center">Error al cargar clientes</td></tr>';
-        return;
-    }
-
-    const { data: asignaciones } = await clienteSupabase
-        .from('asignaciones_rutinas')
-        .select('cliente_id, rutinas(nombre)')
-        .eq('activa', true);
+    const { data: asignaciones } = await clienteSupabase.from('asignaciones_rutinas').select('cliente_id, rutinas(nombre)').eq('activa', true);
 
     tbody.innerHTML = '';
     clientes.forEach(cliente => {
@@ -770,13 +632,20 @@ async function cargarClientes() {
         const nombreRutina = asignacion ? asignacion.rutinas.nombre : '<span class="text-muted fst-italic">Sin asignar</span>';
         const badge = asignacion ? '<span class="badge bg-success">Activa</span>' : '<span class="badge bg-secondary">Inactiva</span>';
 
+        // LÓGICA DE AVATAR (Foto o Inicial)
+        let avatarHTML = '';
+        if (cliente.avatar_url) {
+            avatarHTML = `<img src="${cliente.avatar_url}" class="rounded-circle border border-secondary me-2" style="width: 35px; height: 35px; object-fit: cover;">`;
+        } else {
+            const inicial = cliente.nombre ? cliente.nombre.charAt(0).toUpperCase() : '?';
+            avatarHTML = `<div class="rounded-circle bg-secondary d-flex justify-content-center align-items-center me-2 small fw-bold text-white border border-dark" style="width: 35px; height: 35px;">${inicial}</div>`;
+        }
+
         const fila = `
             <tr>
                 <td class="fw-bold text-white">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-secondary d-flex justify-content-center align-items-center me-2 small" style="width: 30px; height: 30px;">
-                            ${cliente.nombre ? cliente.nombre.charAt(0).toUpperCase() : '?'}
-                        </div>
+                        ${avatarHTML}
                         ${cliente.nombre}
                     </div>
                 </td>
@@ -787,12 +656,9 @@ async function cargarClientes() {
                     </div>
                 </td>
                 <td class="text-end">
-                    <button class="btn btn-sm btn-warning fw-bold" onclick="abrirModalAsignar('${cliente.id}', '${cliente.nombre}')">
-                        Asignar
-                    </button>
+                    <button class="btn btn-sm btn-warning fw-bold" onclick="abrirModalAsignar('${cliente.id}', '${cliente.nombre}')">Asignar</button>
                 </td>
-            </tr>
-        `;
+            </tr>`;
         tbody.innerHTML += fila;
     });
 }
@@ -809,19 +675,14 @@ async function abrirModalAsignar(clienteId, nombreCliente) {
     selReceta.innerHTML = '<option>Cargando...</option>';
     selSugerencia.innerHTML = '<option>Cargando...</option>';
 
-    // Cargar Rutinas
-    const { data: rutinas } = await clienteSupabase
-        .from('rutinas').select('id, nombre').eq('es_plantilla', true).order('nombre');
-
+    const { data: rutinas } = await clienteSupabase.from('rutinas').select('id, nombre').eq('es_plantilla', true).order('nombre');
     selRutina.innerHTML = '';
     if (!rutinas || rutinas.length === 0) selRutina.innerHTML = '<option value="">-- Sin plantillas --</option>';
     else rutinas.forEach(r => selRutina.innerHTML += `<option value="${r.id}">${r.nombre}</option>`);
 
-    // Cargar Recursos
     const { data: recursos } = await clienteSupabase.from('recursos').select('id, nombre, tipo');
     selReceta.innerHTML = '<option value="">-- Ninguna --</option>';
     selSugerencia.innerHTML = '<option value="">-- Ninguno --</option>';
-
     if (recursos) {
         recursos.forEach(r => {
             if (r.tipo === 'receta') selReceta.innerHTML += `<option value="${r.id}">${r.nombre}</option>`;
@@ -832,7 +693,6 @@ async function abrirModalAsignar(clienteId, nombreCliente) {
     new bootstrap.Modal(document.getElementById('modalAsignar')).show();
 }
 
-// GUARDAR ASIGNACIÓN (Updated with SweetAlert)
 async function guardarAsignacion() {
     const clienteId = document.getElementById('idClienteAsignar').value;
     const rutinaId = document.getElementById('selectRutinaAsignar').value;
@@ -842,30 +702,21 @@ async function guardarAsignacion() {
     if (!rutinaId) return Toast.fire({ icon: 'warning', title: 'Selecciona una rutina' });
 
     await clienteSupabase.from('asignaciones_rutinas').update({ activa: false }).eq('cliente_id', clienteId);
-
     const { error } = await clienteSupabase.from('asignaciones_rutinas').insert([{
-        cliente_id: clienteId,
-        rutina_id: rutinaId,
-        activa: true,
-        recurso_receta_id: recetaId,      
-        recurso_sugerencia_id: sugerenciaId
+        cliente_id: clienteId, rutina_id: rutinaId, activa: true,
+        recurso_receta_id: recetaId, recurso_sugerencia_id: sugerenciaId
     }]);
 
-    if (error) {
-        Toast.fire({ icon: 'error', title: 'Error', text: error.message });
-    } else {
+    if (error) Toast.fire({ icon: 'error', title: 'Error', text: error.message });
+    else {
         const el = document.getElementById('modalAsignar');
         const modal = bootstrap.Modal.getInstance(el);
         if(modal) modal.hide();
-        
         cargarClientes();
-        Swal.fire({
-            icon: 'success',
-            title: '¡Asignación guardada!',
-            background: '#1e2126', color: '#fff', confirmButtonColor: '#ffc107', confirmButtonText: 'OK'
-        });
+        Swal.fire({ icon: 'success', title: '¡Asignación guardada!', background: '#1e2126', color: '#fff', confirmButtonColor: '#ffc107', confirmButtonText: 'OK' });
     }
 }
+
 
 // ==========================================
 //      6. PREVISUALIZACIÓN & RECURSOS
@@ -883,10 +734,7 @@ async function previsualizarRutina(id) {
         .order('orden_ejercicio', { ascending: true })
         .order('orden_serie', { ascending: true });
 
-    if (error || detalles.length === 0) {
-        document.getElementById('contenido-preview').innerHTML = '<p class="text-center text-danger">Rutina vacía.</p>';
-        return;
-    }
+    if (error || detalles.length === 0) return document.getElementById('contenido-preview').innerHTML = '<p class="text-center text-danger">Rutina vacía.</p>';
 
     const infoRutina = detalles[0].rutinas_dias.rutinas;
     document.getElementById('tituloPreview').innerText = infoRutina.nombre;
@@ -909,14 +757,12 @@ async function previsualizarRutina(id) {
         btn.className = `btn ${clase} btn-sm`;
         btn.innerText = `Día ${dia}`;
         btn.onclick = () => {
-             // Lógica simple de tabs dentro del modal
              Array.from(contenedorTabs.children).forEach(b => b.className = 'btn btn-outline-secondary btn-sm');
              btn.className = 'btn btn-warning fw-bold btn-sm';
              renderizarDiaPreview(datosPreview[dia]);
         };
         contenedorTabs.appendChild(btn);
     });
-
     renderizarDiaPreview(datosPreview[diasDisponibles[0]]);
 }
 
@@ -940,8 +786,7 @@ function renderizarDiaPreview(ejercicios) {
                         <span class="badge-preview">#${fila.orden_ejercicio}</span>
                     </div>
                     ${img}
-                    <div class="lista-series">
-            `;
+                    <div class="lista-series">`;
         }
         html += `
             <div class="fila-serie-preview row align-items-center text-white">
@@ -962,16 +807,13 @@ async function cargarRecursos() {
     contenedor.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-warning"></div></div>';
     
     const { data: recursos, error } = await clienteSupabase.from('recursos').select('*').order('created_at', { ascending: false });
-
     if (error) return contenedor.innerHTML = '<p class="text-danger">Error</p>';
     contenedor.innerHTML = '';
-    
     if (recursos.length === 0) return contenedor.innerHTML = '<p class="text-muted text-center col-12">No hay archivos.</p>';
 
     recursos.forEach(r => {
         const icono = r.tipo === 'receta' ? 'bi-egg-fried text-success' : 'bi-lightbulb text-info';
         const borde = r.tipo === 'receta' ? 'border-success' : 'border-info';
-        
         contenedor.innerHTML += `
             <div class="col-md-4 mb-3">
                 <div class="card bg-dark-subtle border-start border-4 ${borde} h-100 shadow-sm">
@@ -1000,31 +842,24 @@ async function guardarRecurso() {
     const input = document.getElementById('fileRecurso');
 
     if (!nombre || input.files.length === 0) return Toast.fire({ icon: 'warning', title: 'Faltan datos' });
-
     document.getElementById('status-recurso').classList.remove('d-none');
     
     try {
         const archivo = input.files[0];
         const ext = archivo.name.split('.').pop();
         const path = `${tipo}_${Date.now()}.${ext}`;
-
         const { error: errUpload } = await clienteSupabase.storage.from('materiales').upload(path, archivo);
         if (errUpload) throw new Error("Error subiendo: " + errUpload.message);
 
         const { data: urlData } = clienteSupabase.storage.from('materiales').getPublicUrl(path);
-
-        const { error: errDb } = await clienteSupabase.from('recursos').insert([{ 
-            nombre: nombre, tipo: tipo, archivo_url: urlData.publicUrl 
-        }]);
+        const { error: errDb } = await clienteSupabase.from('recursos').insert([{ nombre: nombre, tipo: tipo, archivo_url: urlData.publicUrl }]);
         if (errDb) throw new Error("Error DB");
 
         const el = document.getElementById('modalRecurso');
         const modal = bootstrap.Modal.getInstance(el);
         if (modal) modal.hide();
-
         cargarRecursos();
         Toast.fire({ icon: 'success', title: 'Recurso subido' });
-
     } catch (error) {
         Toast.fire({ icon: 'error', title: 'Error', text: error.message });
     } finally {
@@ -1044,7 +879,7 @@ async function borrarRecurso(id) {
     }
 }
 
-// TOGGLE MENU
+// TOGGLE MENU MÓVIL
 function toggleMenu() {
     const sidebar = document.querySelector('.sidebar');
     const body = document.body;
