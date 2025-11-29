@@ -1,7 +1,10 @@
-// js/admin.js - VERSIÓN FINAL MODULAR (CRM + FINANZAS + ENTRENAMIENTO)
+// js/admin.js - VERSIÓN CORREGIDA (FIX DASHBOARD)
 
 // VARIABLES GLOBALES
-let idClienteSeleccionado = null; // Para la ficha de cliente
+let idClienteSeleccionado = null;
+let idEjercicioEnEdicion = null;
+let idRutinaEnEdicion = null;
+let rutinaTemporal = { nombre: "", dias: { 1: [] }, diaSeleccionado: 1 };
 
 // ==========================================
 //      1. SEGURIDAD Y NAVEGACIÓN
@@ -12,7 +15,7 @@ async function verificarAdmin() {
     if (!session) {
         window.location.href = 'login.html';
     } else {
-        cargarEjercicios();
+        cambiarVista('dashboard');
     }
 }
 
@@ -27,21 +30,29 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 });
 
 function cambiarVista(vista) {
-    const secciones = ['ejercicios', 'rutinas', 'crear-rutina', 'clientes', 'recursos', 'ficha-cliente'];
+    // 1. Agregamos 'reportes' al array de ocultar
+    const secciones = ['dashboard', 'ejercicios', 'rutinas', 'crear-rutina', 'clientes', 'recursos', 'ficha-cliente', 'finanzas', 'reportes'];
     secciones.forEach(s => {
         const el = document.getElementById(`vista-${s}`);
         if(el) el.classList.add('d-none');
     });
 
-    const botones = ['ejercicios', 'rutinas', 'clientes', 'recursos'];
+    // 2. Agregamos 'reportes' al array de botones
+    const botones = ['dashboard', 'ejercicios', 'rutinas', 'clientes', 'recursos', 'finanzas', 'reportes'];
     botones.forEach(b => {
         const btn = document.getElementById(`btn-nav-${b}`);
         if(btn) btn.className = 'nav-link text-white link-opacity-75-hover';
     });
 
-    if (vista === 'ejercicios') {
+    // 3. Mostrar la seleccionada
+    if (vista === 'dashboard') {
+        document.getElementById('vista-dashboard').classList.remove('d-none');
+        document.getElementById('btn-nav-dashboard').className = 'nav-link active bg-warning text-dark fw-bold';
+        cargarDashboard();
+    } else if (vista === 'ejercicios') {
         document.getElementById('vista-ejercicios').classList.remove('d-none');
         document.getElementById('btn-nav-ejercicios').className = 'nav-link active bg-warning text-dark fw-bold';
+        cargarEjercicios();
     } else if (vista === 'rutinas') {
         document.getElementById('vista-rutinas').classList.remove('d-none');
         document.getElementById('btn-nav-rutinas').className = 'nav-link active bg-warning text-dark fw-bold';
@@ -56,285 +67,97 @@ function cambiarVista(vista) {
         document.getElementById('vista-recursos').classList.remove('d-none');
         document.getElementById('btn-nav-recursos').className = 'nav-link active bg-warning text-dark fw-bold';
         cargarRecursos();
+    } else if (vista === 'finanzas') { 
+        document.getElementById('vista-finanzas').classList.remove('d-none');
+        document.getElementById('btn-nav-finanzas').className = 'nav-link active bg-warning text-dark fw-bold';
+        cargarModuloFinanzas();
+    } else if (vista === 'reportes') { 
+        document.getElementById('vista-reportes').classList.remove('d-none');
+        document.getElementById('btn-nav-reportes').className = 'nav-link active bg-warning text-dark fw-bold';
+        // Inicializar fechas
+        const hoy = new Date();
+        const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+        const manana = new Date(hoy); manana.setDate(manana.getDate() + 1);
+        const fechaFin = manana.toISOString().split('T')[0];
+        document.getElementById('rep-desde').value = primerDia;
+        document.getElementById('rep-hasta').value = fechaFin;
+        generarReportes();
     }
 }
 
 
 // ==========================================
-//      2. GESTIÓN DE CLIENTES & FICHA CRM
+//      2. DASHBOARD (CORREGIDO)
 // ==========================================
 
-async function cargarClientes() {
-    const tbody = document.getElementById('tabla-clientes');
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-5"><div class="spinner-border text-warning"></div></td></tr>';
+async function cargarDashboard() {
+    const hoy = new Date();
+    document.getElementById('dash-fecha').innerText = hoy.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    const { data: clientes, error } = await clienteSupabase.from('perfiles').select('*').eq('rol', 'cliente').order('nombre');
-    if (error) return tbody.innerHTML = '<tr><td colspan="3" class="text-danger text-center">Error al cargar clientes</td></tr>';
+    // 1. INGRESOS DEL MES
+    const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString();
+    
+    // CORRECCIÓN AQUÍ: Pedimos 'fecha_pago' en vez de 'created_at'
+    const { data: pagos, error } = await clienteSupabase
+        .from('pagos_historial')
+        .select('monto, fecha_pago, perfiles(nombre)') 
+        .gte('fecha_pago', primerDiaMes)
+        .order('fecha_pago', { ascending: false });
 
-    const { data: asignaciones } = await clienteSupabase.from('asignaciones_rutinas').select('cliente_id, rutinas(nombre)').eq('activa', true);
+    if(error) console.error("Error Dashboard:", error);
 
-    tbody.innerHTML = '';
-    const hoy = new Date(); hoy.setHours(0,0,0,0);
-
-    clientes.forEach(cliente => {
-        const asignacion = asignaciones.find(a => a.cliente_id === cliente.id);
-        const nombreRutina = asignacion ? asignacion.rutinas.nombre : '<span class="text-muted fst-italic">Sin asignar</span>';
-        
-        let badgePago = '<span class="badge bg-secondary border border-secondary">Sin Datos</span>';
-        if (cliente.fecha_vencimiento_pago) {
-            const vencimiento = new Date(cliente.fecha_vencimiento_pago + 'T00:00:00');
-            const diferenciaMs = vencimiento - hoy;
-            const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24)); 
-
-            if (diasRestantes > 7) {
-                const fechaStr = vencimiento.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
-                badgePago = `<span class="badge bg-success bg-opacity-25 text-success border border-success">Vence: ${fechaStr}</span>`;
-            } else if (diasRestantes >= 0) {
-                badgePago = `<span class="badge bg-warning text-dark border border-warning">Vence en ${diasRestantes} días</span>`;
-            } else if (diasRestantes >= -7) {
-                badgePago = `<span class="badge bg-orange text-white border border-white" style="background-color: #fd7e14;">Gracia (${Math.abs(diasRestantes)} días)</span>`;
-            } else {
-                badgePago = `<span class="badge bg-danger bg-opacity-25 text-danger border border-danger">VENCIDO</span>`;
+    let totalIngresos = 0;
+    let htmlPagos = '';
+    
+    if (pagos && pagos.length > 0) {
+        pagos.forEach((p, index) => {
+            totalIngresos += parseFloat(p.monto);
+            if (index < 5) { // Top 5 recientes
+                // Usamos fecha_pago para mostrar
+                const fechaCorta = new Date(p.fecha_pago).toLocaleDateString();
+                htmlPagos += `<tr><td class="ps-3 text-secondary small">${fechaCorta}</td><td class="text-white">${p.perfiles.nombre}</td><td class="text-end pe-3 text-success fw-bold">+$${p.monto}</td></tr>`;
             }
-        } else {
-             badgePago = `<span class="badge bg-danger bg-opacity-25 text-danger border border-danger">Sin Pago</span>`;
-        }
-
-        let avatarHTML = cliente.avatar_url 
-            ? `<img src="${cliente.avatar_url}" class="rounded-circle border border-secondary me-2" style="width: 35px; height: 35px; object-fit: cover;">`
-            : `<div class="rounded-circle bg-secondary d-flex justify-content-center align-items-center me-2 small fw-bold text-white border border-dark" style="width: 35px; height: 35px;">${cliente.nombre.charAt(0).toUpperCase()}</div>`;
-
-        const fila = `
-            <tr>
-                <td class="text-white">
-                    <div class="d-flex align-items-center mb-1">${avatarHTML}<span class="fw-bold">${cliente.nombre}</span></div>
-                    <div class="ms-5 ps-1 small">${badgePago}</div>
-                </td>
-                <td><div class="text-secondary small mb-1">Rutina:</div><div class="text-white small">${nombreRutina}</div></td>
-                <td class="text-end">
-                    <button class="btn btn-sm btn-outline-light" onclick="abrirFichaCliente('${cliente.id}')" title="Ver Ficha Completa"><i class="bi bi-person-lines-fill"></i></button>
-                </td>
-            </tr>`;
-        tbody.innerHTML += fila;
-    });
-}
-
-// --- FICHA CLIENTE (CRM) ---
-async function abrirFichaCliente(id) {
-    idClienteSeleccionado = id;
-    
-    // UI Change
-    document.getElementById('vista-clientes').classList.add('d-none');
-    document.getElementById('vista-ficha-cliente').classList.remove('d-none');
-    
-    // Load Personal Data
-    const { data: perfil } = await clienteSupabase.from('perfiles').select('*').eq('id', id).single();
-    
-    document.getElementById('ficha-nombre').innerText = perfil.nombre;
-    document.getElementById('crm-telefono').value = perfil.telefono || '';
-    document.getElementById('crm-nacimiento').value = perfil.fecha_nacimiento || '';
-    document.getElementById('crm-direccion').value = perfil.direccion || '';
-    document.getElementById('crm-emergencia-nombre').value = perfil.contacto_emergencia_nombre || '';
-    document.getElementById('crm-emergencia-tel').value = perfil.contacto_emergencia_telefono || '';
-    document.getElementById('crm-notas').value = perfil.observaciones_admin || '';
-
-    // Update Top Badge
-    const divEstado = document.getElementById('ficha-estado');
-    if(perfil.fecha_vencimiento_pago) {
-        divEstado.className = 'badge bg-success';
-        divEstado.innerText = `Vence: ${perfil.fecha_vencimiento_pago}`;
+        });
     } else {
-        divEstado.className = 'badge bg-danger';
-        divEstado.innerText = 'Sin Pago';
+        htmlPagos = `<tr><td colspan="3" class="text-center text-muted py-5 small">Sin movimientos este mes.</td></tr>`;
     }
 
-    // Load Payments & Routine
-    cargarHistorialPagos(id);
-    cargarRutinaActualCRM(id);
-}
+    document.getElementById('dash-ingresos').innerText = `$${totalIngresos.toLocaleString()}`;
+    document.getElementById('dash-pagos-count').innerText = `${pagos ? pagos.length : 0} pagos este mes`;
+    document.getElementById('dash-tabla-pagos').innerHTML = htmlPagos;
 
-function cerrarFichaCliente() {
-    document.getElementById('vista-ficha-cliente').classList.add('d-none');
-    document.getElementById('vista-clientes').classList.remove('d-none');
-    cargarClientes();
-}
+    // 2. CLIENTES Y CUMPLEAÑOS
+    const { data: clientes } = await clienteSupabase.from('perfiles').select('*').eq('rol', 'cliente');
+    let activos = 0;
+    let htmlCumples = '';
+    const mesActual = hoy.getMonth() + 1; 
 
-async function guardarDatosCRM() {
-    const datos = {
-        telefono: document.getElementById('crm-telefono').value,
-        fecha_nacimiento: document.getElementById('crm-nacimiento').value || null,
-        direccion: document.getElementById('crm-direccion').value,
-        contacto_emergencia_nombre: document.getElementById('crm-emergencia-nombre').value,
-        contacto_emergencia_telefono: document.getElementById('crm-emergencia-tel').value,
-        observaciones_admin: document.getElementById('crm-notas').value
-    };
-
-    const { error } = await clienteSupabase.from('perfiles').update(datos).eq('id', idClienteSeleccionado);
-    if (error) Toast.fire({ icon: 'error', title: 'Error', text: error.message });
-    else Toast.fire({ icon: 'success', title: 'Datos guardados' });
-}
-
-async function registrarPago() {
-    const monto = document.getElementById('fin-monto').value;
-    const meses = parseInt(document.getElementById('fin-meses').value);
-    const metodo = document.getElementById('fin-metodo').value;
-
-    if (!monto || monto <= 0) return Toast.fire({ icon: 'warning', title: 'Ingresa un monto válido' });
-
-    // Calc Date
-    const { data: perfil } = await clienteSupabase.from('perfiles').select('fecha_vencimiento_pago').eq('id', idClienteSeleccionado).single();
-    let fechaBase = new Date();
-    const hoy = new Date(); hoy.setHours(0,0,0,0);
-
-    if (perfil.fecha_vencimiento_pago) {
-        const actual = new Date(perfil.fecha_vencimiento_pago + 'T00:00:00');
-        if (actual > hoy) fechaBase = actual;
+    if (clientes) {
+        clientes.forEach(c => {
+            // Contar Activos
+            if (c.fecha_vencimiento_pago) {
+                const vence = new Date(c.fecha_vencimiento_pago + 'T00:00:00');
+                if (vence >= hoy) activos++;
+            }
+            // Cumpleaños
+            if (c.fecha_nacimiento) {
+                const mesCumple = parseInt(c.fecha_nacimiento.split('-')[1]);
+                const diaCumple = c.fecha_nacimiento.split('-')[2];
+                if (mesCumple === mesActual) {
+                    htmlCumples += `<div class="list-group-item bg-transparent border-secondary text-white d-flex align-items-center"><i class="bi bi-cake2-fill text-warning me-3"></i><div><div class="fw-bold">${c.nombre}</div><small class="text-muted">Día ${diaCumple}</small></div></div>`;
+                }
+            }
+        });
     }
 
-    const diaOriginal = fechaBase.getDate();
-    fechaBase.setMonth(fechaBase.getMonth() + meses);
-    if (fechaBase.getDate() !== diaOriginal) fechaBase.setDate(0);
-    const fechaSQL = fechaBase.toISOString().split('T')[0];
-
-    // Insert History
-    const { error: errHist } = await clienteSupabase.from('pagos_historial').insert([{
-        cliente_id: idClienteSeleccionado, monto: monto, meses_abonados: meses, metodo_pago: metodo
-    }]);
-    if (errHist) return Toast.fire({ icon: 'error', title: 'Error historial', text: errHist.message });
-
-    // Update Profile
-    const { error: errPerf } = await clienteSupabase.from('perfiles').update({ fecha_vencimiento_pago: fechaSQL, pago_al_dia: true }).eq('id', idClienteSeleccionado);
-    if (errPerf) return Toast.fire({ icon: 'error', title: 'Error perfil', text: errPerf.message });
-
-    Toast.fire({ icon: 'success', title: 'Pago registrado', text: `Vence: ${fechaSQL}` });
-    document.getElementById('fin-monto').value = ""; 
-    cargarHistorialPagos(idClienteSeleccionado);
-    document.getElementById('ficha-estado').innerText = `Vence: ${fechaSQL}`;
-    document.getElementById('ficha-estado').className = 'badge bg-success';
-}
-
-async function cargarHistorialPagos(id) {
-    const tbody = document.getElementById('tabla-historial-pagos');
-    tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
-    const { data: pagos } = await clienteSupabase.from('pagos_historial').select('*').eq('cliente_id', id).order('fecha_pago', { ascending: false });
-    
-    tbody.innerHTML = '';
-    if (!pagos || pagos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Sin pagos registrados</td></tr>';
-        return;
-    }
-    pagos.forEach(p => {
-        const fecha = new Date(p.fecha_pago).toLocaleDateString();
-        tbody.innerHTML += `<tr><td class="text-secondary">${fecha}</td><td>${p.meses_abonados} Mes(es) <span class="badge bg-dark border border-secondary text-secondary">${p.metodo_pago}</span></td><td class="text-success fw-bold">$${p.monto}</td></tr>`;
-    });
-}
-
-async function revocarAcceso() {
-    if(!confirm("¿Quitar acceso inmediatamente?")) return;
-    await clienteSupabase.from('perfiles').update({ fecha_vencimiento_pago: '2020-01-01' }).eq('id', idClienteSeleccionado);
-    Toast.fire({ icon: 'success', title: 'Acceso revocado' });
-    document.getElementById('ficha-estado').innerText = 'Sin Pago';
-    document.getElementById('ficha-estado').className = 'badge bg-danger';
-}
-
-// EN js/admin.js
-
-// EN js/admin.js
-
-async function cargarRutinaActualCRM(id) {
-    // 1. Buscamos los elementos en el HTML
-    const lblActual = document.getElementById('crm-rutina-actual');
-    const tbody = document.getElementById('tabla-historial-rutinas');
-
-    // Validación de seguridad: si no encuentra la tabla, frena para no romper todo
-    if (!lblActual || !tbody) {
-        console.error("Error: No encuentro los elementos de la tabla historial en el HTML");
-        return;
-    }
-    
-    // 2. Limpiamos antes de cargar
-    lblActual.innerText = "Cargando...";
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-3"><div class="spinner-border text-warning spinner-border-sm"></div></td></tr>';
-
-    // 3. Consultamos a Supabase
-    const { data: asignaciones, error } = await clienteSupabase
-        .from('asignaciones_rutinas')
-        .select('created_at, activa, rutinas(nombre)')
-        .eq('cliente_id', id)
-        .order('created_at', { ascending: false });
-
-    // Si hubo error o no hay datos
-    if (error || !asignaciones || asignaciones.length === 0) {
-        lblActual.innerText = "Sin Rutina Activa";
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4 small fst-italic">El cliente nunca tuvo rutinas asignadas.</td></tr>';
-        return;
-    }
-
-    // 4. Procesamos los datos para mostrarlos
-    tbody.innerHTML = ""; // Limpiar spinner
-    let hayActiva = false;
-
-    asignaciones.forEach(asig => {
-        // Formato de fecha
-        const dateObj = new Date(asig.created_at);
-        const fecha = dateObj.toLocaleDateString();
-        const hora = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        
-        const nombreRutina = asig.rutinas ? asig.rutinas.nombre : '(Rutina Eliminada)';
-
-        if (asig.activa) {
-            hayActiva = true;
-            // A. ACTIVA (Tarjeta Grande + Fila Destacada)
-            lblActual.innerText = nombreRutina;
-            
-            tbody.innerHTML += `
-                <tr class="fila-activa">
-                    <td class="ps-3 py-3">
-                        <div class="text-warning fw-bold small mb-1">ASIGNADA EL</div>
-                        <div class="text-white">${fecha} <small class="text-secondary opacity-75">${hora}</small></div>
-                    </td>
-                    <td class="py-3">
-                        <div class="text-warning fw-bold small mb-1">RUTINA</div>
-                        <div class="text-white fw-bold fs-5">${nombreRutina}</div>
-                    </td>
-                    <td class="text-end pe-3 py-3 align-middle">
-                        <span class="badge bg-warning text-dark border border-warning shadow-sm">
-                            <i class="bi bi-check-circle-fill me-1"></i>ACTIVA
-                        </span>
-                    </td>
-                </tr>`;
-        } else {
-            // B. HISTORIAL (Sutil)
-            tbody.innerHTML += `
-                <tr>
-                    <td class="ps-3 py-3 align-middle">
-                        <div class="text-dimmed small">${fecha}</div>
-                    </td>
-                    <td class="py-3 align-middle">
-                        <div class="text-secondary">${nombreRutina}</div>
-                    </td>
-                    <td class="text-end pe-3 py-3 align-middle">
-                        <span class="badge bg-dark border border-secondary text-secondary">
-                            <i class="bi bi-clock-history me-1"></i>Archivada
-                        </span>
-                    </td>
-                </tr>`;
-        }
-    });
-
-    if (!hayActiva) {
-        lblActual.innerText = "Sin Rutina Activa";
-    }
-}
-
-function abrirModalAsignarDesdeFicha() {
-    const nombre = document.getElementById('ficha-nombre').innerText;
-    abrirModalAsignar(idClienteSeleccionado, nombre);
+    document.getElementById('dash-activos').innerText = activos;
+    document.getElementById('dash-total-clientes').innerText = `De ${clientes ? clientes.length : 0} registrados`;
+    document.getElementById('lista-cumples').innerHTML = htmlCumples || `<div class="p-5 text-center text-muted small"><i class="bi bi-calendar-x fs-4 d-block mb-2 opacity-50"></i>Nadie cumple años este mes.</div>`;
 }
 
 
 // ==========================================
-//      3. GESTIÓN DE EJERCICIOS (CRUD + SKELETON)
+//      3. GESTIÓN DE EJERCICIOS
 // ==========================================
 
 async function cargarEjercicios() {
@@ -342,6 +165,7 @@ async function cargarEjercicios() {
     let skeletonHTML = '';
     for(let i=0; i<5; i++) skeletonHTML += `<tr><td><div class="skeleton skeleton-avatar"></div></td><td><div class="skeleton skeleton-title mb-0"></div></td><td><div class="skeleton skeleton-btn" style="width: 60px;"></div></td><td class="text-end"><div class="d-flex justify-content-end gap-2"><div class="skeleton skeleton-btn" style="width: 35px;"></div><div class="skeleton skeleton-btn" style="width: 35px;"></div></div></td></tr>`;
     tbody.innerHTML = skeletonHTML;
+
     await new Promise(r => setTimeout(r, 300)); 
 
     const { data: ejercicios, error } = await clienteSupabase.from('ejercicios_catalogo').select('*').order('id', { ascending: false });
@@ -412,14 +236,13 @@ async function guardarEjercicio() {
 }
 
 async function borrarEjercicio(id) {
-    const result = await Popup.fire({ title: '¿Borrar ejercicio?', text: "Esta acción no se puede deshacer.", icon: 'warning', confirmButtonText: 'Sí, borrar' });
-    if (!result.isConfirmed) return;
+    if (!(await Popup.fire({ title: '¿Borrar ejercicio?', icon: 'warning', confirmButtonText: 'Sí, borrar' })).isConfirmed) return;
     const { data: ejercicio } = await clienteSupabase.from('ejercicios_catalogo').select('imagen_url').eq('id', id).single();
     if (ejercicio && ejercicio.imagen_url && ejercicio.imagen_url.includes('supabase')) {
         try { await clienteSupabase.storage.from('ejercicios').remove([ejercicio.imagen_url.split('/').pop()]); } catch (e) { console.error(e); }
     }
     const { error } = await clienteSupabase.from('ejercicios_catalogo').delete().eq('id', id);
-    if (error) Toast.fire({ icon: 'error', title: 'Error al borrar', text: error.message });
+    if (error) Toast.fire({ icon: 'error', title: 'Error', text: error.message });
     else { cargarEjercicios(); Toast.fire({ icon: 'success', title: 'Eliminado' }); }
 }
 
@@ -434,7 +257,7 @@ async function cargarRutinas() {
     const { data: rutinas, error } = await clienteSupabase.from('rutinas').select('*').order('id', { ascending: false });
     if (error) return tbody.innerHTML = '<tr><td colspan="4" class="text-danger text-center">Error al cargar rutinas</td></tr>';
     tbody.innerHTML = '';
-    if (rutinas.length === 0) return tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No hay rutinas.</td></tr>';
+    if (rutinas.length === 0) return tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No hay rutinas creadas.</td></tr>';
     rutinas.forEach(rutina => {
         const fila = `<tr><td class="fw-bold text-white">${rutina.nombre}</td><td><span class="badge bg-info text-dark">Plantilla</span></td><td>${rutina.nivel_dias} días</td><td class="text-end"><button class="btn btn-sm btn-outline-info me-1" onclick="previsualizarRutina(${rutina.id})"><i class="bi bi-eye"></i></button><button class="btn btn-sm btn-outline-warning me-1" onclick="editarRutina(${rutina.id})"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" onclick="borrarRutina(${rutina.id})"><i class="bi bi-trash"></i></button></td></tr>`;
         tbody.innerHTML += fila;
@@ -442,15 +265,11 @@ async function cargarRutinas() {
 }
 
 async function borrarRutina(id) {
-    const result = await Popup.fire({ title: '¿Eliminar rutina?', icon: 'warning', confirmButtonText: 'Sí, eliminar' });
-    if (!result.isConfirmed) return;
+    if (!(await Popup.fire({ title: '¿Eliminar rutina?', icon: 'warning', confirmButtonText: 'Sí, eliminar' })).isConfirmed) return;
     const { error } = await clienteSupabase.from('rutinas').delete().eq('id', id);
     if (error) Toast.fire({ icon: 'error', title: 'Error', text: error.message });
     else { cargarRutinas(); Toast.fire({ icon: 'success', title: 'Eliminada' }); }
 }
-
-let rutinaTemporal = { nombre: "", dias: { 1: [] }, diaSeleccionado: 1 };
-let idRutinaEnEdicion = null; 
 
 function abrirConstructor() {
     cambiarVista('crear-rutina');
@@ -544,7 +363,6 @@ async function eliminarDiaActual() {
     if (Object.keys(rutinaTemporal.dias).length <= 1) return Toast.fire({ icon: 'info', title: 'Mínimo un día' });
     if (!(await Popup.fire({ title: `¿Borrar Día ${diaActual}?`, icon: 'warning' })).isConfirmed) return;
     delete rutinaTemporal.dias[diaActual];
-    // Reindexar días
     const nuevosDias = {}; let i = 1;
     for(let key in rutinaTemporal.dias) { nuevosDias[i] = rutinaTemporal.dias[key]; i++; }
     rutinaTemporal.dias = nuevosDias;
@@ -586,7 +404,416 @@ async function guardarRutinaCompleta() {
     abrirConstructor(); cambiarVista('rutinas');
 }
 
-// ASIGNACIÓN
+
+// ==========================================
+//      5. GESTIÓN DE CLIENTES & FICHA 360°
+// ==========================================
+
+async function cargarClientes() {
+    const tbody = document.getElementById('tabla-clientes');
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-5"><div class="spinner-border text-warning"></div></td></tr>';
+
+    const { data: clientes, error } = await clienteSupabase.from('perfiles').select('*').eq('rol', 'cliente').order('nombre');
+    if (error) return tbody.innerHTML = '<tr><td colspan="3" class="text-danger text-center">Error al cargar clientes</td></tr>';
+
+    const { data: asignaciones } = await clienteSupabase.from('asignaciones_rutinas').select('cliente_id, rutinas(nombre)').eq('activa', true);
+
+    tbody.innerHTML = '';
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+    clientes.forEach(cliente => {
+        const asignacion = asignaciones.find(a => a.cliente_id === cliente.id);
+        const nombreRutina = asignacion ? asignacion.rutinas.nombre : '<span class="text-muted fst-italic">Sin asignar</span>';
+        
+        let badgePago = '<span class="badge bg-secondary border border-secondary">Sin Datos</span>';
+        if (cliente.fecha_vencimiento_pago) {
+            const vencimiento = new Date(cliente.fecha_vencimiento_pago + 'T00:00:00');
+            const diferenciaMs = vencimiento - hoy;
+            const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24)); 
+
+            if (diasRestantes > 7) {
+                const fechaStr = vencimiento.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                badgePago = `<span class="badge bg-success bg-opacity-25 text-success border border-success">Vence: ${fechaStr}</span>`;
+            } else if (diasRestantes >= 0) {
+                badgePago = `<span class="badge bg-warning text-dark border border-warning">Vence en ${diasRestantes} días</span>`;
+            } else if (diasRestantes >= -7) {
+                badgePago = `<span class="badge bg-orange text-white border border-white" style="background-color: #fd7e14;">Gracia (${Math.abs(diasRestantes)} días)</span>`;
+            } else {
+                badgePago = `<span class="badge bg-danger bg-opacity-25 text-danger border border-danger">VENCIDO</span>`;
+            }
+        } else {
+             badgePago = `<span class="badge bg-danger bg-opacity-25 text-danger border border-danger">Sin Pago</span>`;
+        }
+
+        let avatarHTML = cliente.avatar_url 
+            ? `<img src="${cliente.avatar_url}" class="rounded-circle border border-secondary me-2" style="width: 35px; height: 35px; object-fit: cover;">`
+            : `<div class="rounded-circle bg-secondary d-flex justify-content-center align-items-center me-2 small fw-bold text-white border border-dark" style="width: 35px; height: 35px;">${cliente.nombre.charAt(0).toUpperCase()}</div>`;
+
+        const fila = `
+            <tr>
+                <td class="text-white">
+                    <div class="d-flex align-items-center mb-1">${avatarHTML}<span class="fw-bold">${cliente.nombre}</span></div>
+                    <div class="ms-5 ps-1 small">${badgePago}</div>
+                </td>
+                <td><div class="text-secondary small mb-1">Rutina:</div><div class="text-white small">${nombreRutina}</div></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-light" onclick="abrirFichaCliente('${cliente.id}')" title="Ver Ficha"><i class="bi bi-person-lines-fill"></i></button>
+                </td>
+            </tr>`;
+        tbody.innerHTML += fila;
+    });
+}
+
+// --- FICHA CLIENTE ---
+async function abrirFichaCliente(id) {
+    idClienteSeleccionado = id;
+    
+    // 1. UI: Gestionar Vistas (Ocultar orígenes posibles)
+    document.getElementById('vista-clientes').classList.add('d-none');
+    document.getElementById('vista-finanzas').classList.add('d-none'); // Importante para volver de finanzas
+    document.getElementById('vista-ficha-cliente').classList.remove('d-none');
+    
+    // 2. Cargar Datos del Perfil
+    // 'created_at' viene por defecto en el select('*')
+    const { data: perfil } = await clienteSupabase
+        .from('perfiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+    
+    // Header Nombre
+    document.getElementById('ficha-nombre').innerText = perfil.nombre;
+    
+    // --- NUEVO: MOSTRAR FECHA DE ALTA (MIEMBRO DESDE) ---
+    if (perfil.created_at) {
+        const fechaAlta = new Date(perfil.created_at).toLocaleDateString('es-ES', { 
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric' 
+        });
+        document.getElementById('crm-fecha-alta').innerText = fechaAlta;
+    } else {
+        document.getElementById('crm-fecha-alta').innerText = "-";
+    }
+    // ----------------------------------------------------
+
+    // Campos Editables
+    document.getElementById('crm-telefono').value = perfil.telefono || '';
+    document.getElementById('crm-nacimiento').value = perfil.fecha_nacimiento || '';
+    document.getElementById('crm-direccion').value = perfil.direccion || '';
+    document.getElementById('crm-emergencia-nombre').value = perfil.contacto_emergencia_nombre || '';
+    document.getElementById('crm-emergencia-tel').value = perfil.contacto_emergencia_telefono || '';
+    document.getElementById('crm-notas').value = perfil.observaciones_admin || '';
+
+    // Badge de Estado (Arriba a la derecha)
+    const divEstado = document.getElementById('ficha-estado');
+    if (perfil.fecha_vencimiento_pago) {
+        // Podrías agregar lógica de colores aquí si está vencido, por ahora verde simple
+        divEstado.className = 'badge bg-success';
+        divEstado.innerText = `Vence: ${perfil.fecha_vencimiento_pago}`;
+    } else {
+        divEstado.className = 'badge bg-danger';
+        divEstado.innerText = 'Sin Pago';
+    }
+
+    // 3. Cargar Sub-Módulos
+    cargarHistorialPagos(id);
+    cargarRutinaActualCRM(id);
+}
+
+function cerrarFichaCliente() {
+    document.getElementById('vista-ficha-cliente').classList.add('d-none');
+    
+    // Por simplicidad, al volver siempre vamos a la lista de Clientes
+    // O podrías volver al Dashboard si prefieres
+    document.getElementById('vista-clientes').classList.remove('d-none');
+    
+    // Nos aseguramos que el menú lateral resalte "Clientes"
+    document.getElementById('btn-nav-clientes').click(); 
+    
+    cargarClientes();
+}
+
+async function guardarDatosCRM() {
+    const datos = {
+        telefono: document.getElementById('crm-telefono').value,
+        fecha_nacimiento: document.getElementById('crm-nacimiento').value || null,
+        direccion: document.getElementById('crm-direccion').value,
+        contacto_emergencia_nombre: document.getElementById('crm-emergencia-nombre').value,
+        contacto_emergencia_telefono: document.getElementById('crm-emergencia-tel').value,
+        observaciones_admin: document.getElementById('crm-notas').value
+    };
+    const { error } = await clienteSupabase.from('perfiles').update(datos).eq('id', idClienteSeleccionado);
+    if (error) Toast.fire({ icon: 'error', title: 'Error', text: error.message });
+    else Toast.fire({ icon: 'success', title: 'Datos guardados' });
+}
+
+async function registrarPago() {
+    const monto = document.getElementById('fin-monto').value;
+    const meses = parseInt(document.getElementById('fin-meses').value);
+    const metodo = document.getElementById('fin-metodo').value;
+
+    if (!monto || monto <= 0) return Toast.fire({ icon: 'warning', title: 'Monto inválido' });
+
+    const { data: perfil } = await clienteSupabase.from('perfiles').select('fecha_vencimiento_pago').eq('id', idClienteSeleccionado).single();
+    let fechaBase = new Date();
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+    if (perfil.fecha_vencimiento_pago) {
+        const actual = new Date(perfil.fecha_vencimiento_pago + 'T00:00:00');
+        if (actual > hoy) fechaBase = actual;
+    }
+
+    const diaOriginal = fechaBase.getDate();
+    fechaBase.setMonth(fechaBase.getMonth() + meses);
+    if (fechaBase.getDate() !== diaOriginal) fechaBase.setDate(0);
+    const fechaSQL = fechaBase.toISOString().split('T')[0];
+
+    const { error: errHist } = await clienteSupabase.from('pagos_historial').insert([{
+        cliente_id: idClienteSeleccionado, monto, meses_abonados: meses, metodo_pago: metodo
+    }]);
+    if (errHist) return Toast.fire({ icon: 'error', title: 'Error historial', text: errHist.message });
+
+    const { error: errPerf } = await clienteSupabase.from('perfiles').update({ fecha_vencimiento_pago: fechaSQL }).eq('id', idClienteSeleccionado);
+    if (errPerf) return Toast.fire({ icon: 'error', title: 'Error perfil', text: errPerf.message });
+
+    Toast.fire({ icon: 'success', title: 'Pago registrado', text: `Vence: ${fechaSQL}` });
+    document.getElementById('fin-monto').value = ""; 
+    cargarHistorialPagos(idClienteSeleccionado);
+    document.getElementById('ficha-estado').innerText = `Vence: ${fechaSQL}`;
+    document.getElementById('ficha-estado').className = 'badge bg-success';
+}
+
+// 1. CARGAR HISTORIAL (CON BOTONES DE ACCIÓN)
+async function cargarHistorialPagos(id) {
+    const tbody = document.getElementById('tabla-historial-pagos');
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3">Cargando...</td></tr>';
+
+    const { data: pagos } = await clienteSupabase
+        .from('pagos_historial')
+        .select('*')
+        .eq('cliente_id', id)
+        .order('fecha_pago', { ascending: false });
+    
+    tbody.innerHTML = '';
+    
+    // Ajustamos la cabecera de la tabla en el HTML dinámicamente si hace falta, 
+    // pero idealmente ve a admin.html y agrega <th>Acciones</th> en el thead de esa tabla.
+    
+    if (!pagos || pagos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">Sin pagos registrados</td></tr>';
+        return;
+    }
+
+    pagos.forEach(p => {
+        const fecha = new Date(p.fecha_pago).toLocaleDateString();
+        const html = `
+            <tr>
+                <td class="text-secondary align-middle">${fecha}</td>
+                <td class="align-middle">
+                    ${p.meses_abonados} Mes(es) 
+                    <span class="badge bg-dark border border-secondary text-secondary ms-1" style="font-size: 0.65rem;">${p.metodo_pago}</span>
+                </td>
+                <td class="text-success fw-bold align-middle">$${p.monto}</td>
+                <td class="text-end align-middle">
+                    <button class="btn btn-sm btn-link text-warning p-0 me-2" onclick="prepararEdicionPago(${p.id})" title="Editar">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <button class="btn btn-sm btn-link text-danger p-0" onclick="borrarPago(${p.id})" title="Eliminar">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>`;
+        tbody.innerHTML += html;
+    });
+}
+
+// 2. BORRAR PAGO
+async function borrarPago(idPago) {
+    const result = await Popup.fire({
+        title: '¿Eliminar registro?',
+        text: "Esto afectará el balance de caja, pero NO cambiará la fecha de vencimiento del cliente.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        confirmButtonColor: '#d33'
+    });
+
+    if (!result.isConfirmed) return;
+
+    const { error } = await clienteSupabase
+        .from('pagos_historial')
+        .delete()
+        .eq('id', idPago);
+
+    if (error) {
+        Toast.fire({ icon: 'error', title: 'Error', text: error.message });
+    } else {
+        Toast.fire({ icon: 'success', title: 'Registro eliminado' });
+        // Recargamos la tabla para ver que desapareció
+        cargarHistorialPagos(idClienteSeleccionado);
+    }
+}
+
+// 3. EDITAR PAGO (Abrir Modal)
+async function prepararEdicionPago(idPago) {
+    // Buscar datos actuales
+    const { data: pago, error } = await clienteSupabase
+        .from('pagos_historial')
+        .select('*')
+        .eq('id', idPago)
+        .single();
+
+    if (error) return Toast.fire({ icon: 'error', title: 'Error al cargar pago' });
+
+    // Llenar modal
+    document.getElementById('idPagoEditar').value = pago.id;
+    document.getElementById('edit-monto').value = pago.monto;
+    document.getElementById('edit-meses').value = pago.meses_abonados;
+    document.getElementById('edit-metodo').value = pago.metodo_pago;
+
+    new bootstrap.Modal(document.getElementById('modalEditarPago')).show();
+}
+
+// 4. GUARDAR EDICIÓN
+async function guardarEdicionPago() {
+    const id = document.getElementById('idPagoEditar').value;
+    const monto = document.getElementById('edit-monto').value;
+    const meses = document.getElementById('edit-meses').value;
+    const metodo = document.getElementById('edit-metodo').value;
+
+    if (!monto || monto <= 0) return Toast.fire({ icon: 'warning', title: 'Monto inválido' });
+
+    const { error } = await clienteSupabase
+        .from('pagos_historial')
+        .update({
+            monto: monto,
+            meses_abonados: meses,
+            metodo_pago: metodo
+        })
+        .eq('id', id);
+
+    if (error) {
+        Toast.fire({ icon: 'error', title: 'Error', text: error.message });
+    } else {
+        // Cerrar modal
+        const el = document.getElementById('modalEditarPago');
+        const modal = bootstrap.Modal.getInstance(el);
+        if (modal) modal.hide();
+
+        Toast.fire({ icon: 'success', title: 'Corrección guardada' });
+        cargarHistorialPagos(idClienteSeleccionado);
+    }
+}
+
+async function revocarAcceso() {
+    if(!(await Popup.fire({ title: '¿Revocar acceso?', text: "Se bloqueará al cliente.", icon: 'warning', confirmButtonText: 'Sí, bloquear', confirmButtonColor: '#d33' })).isConfirmed) return;
+    await clienteSupabase.from('perfiles').update({ fecha_vencimiento_pago: '2020-01-01' }).eq('id', idClienteSeleccionado);
+    Toast.fire({ icon: 'success', title: 'Acceso revocado' });
+    document.getElementById('ficha-estado').innerText = 'Sin Pago';
+    document.getElementById('ficha-estado').className = 'badge bg-danger';
+}
+
+// CRM - ENTRENAMIENTO (HERO CARD)
+
+async function cargarRutinaActualCRM(id) {
+    const contenedorHero = document.getElementById('contenedor-rutina-hero');
+    const tbody = document.getElementById('tabla-historial-rutinas');
+
+    // Validación de seguridad
+    if (!contenedorHero || !tbody) return;
+
+    // Estado de Carga
+    contenedorHero.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-warning"></div></div>';
+    tbody.innerHTML = '';
+
+    const { data: asignaciones, error } = await clienteSupabase
+        .from('asignaciones_rutinas')
+        .select('created_at, activa, rutinas(nombre, descripcion)')
+        .eq('cliente_id', id)
+        .order('created_at', { ascending: false });
+
+    // CASO 1: CLIENTE SIN RUTINAS (NUNCA TUVO)
+    if (error || !asignaciones || asignaciones.length === 0) {
+        contenedorHero.innerHTML = `
+            <div class="card bg-dark-subtle border border-secondary border-dashed p-5 text-center rounded-4">
+                <i class="bi bi-clipboard-x fs-1 text-secondary mb-3 opacity-50"></i>
+                <h4 class="text-white">Sin Rutina Asignada</h4>
+                <p class="text-muted small">Este cliente aún no tiene un plan de entrenamiento.</p>
+                <button class="btn btn-warning fw-bold mt-2 rounded-pill px-4" onclick="abrirModalAsignarDesdeFicha()">
+                    <i class="bi bi-plus-lg me-2"></i>Asignar Primera Rutina
+                </button>
+            </div>`;
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted small py-4">No hay historial disponible.</td></tr>';
+        return;
+    }
+
+    // CASO 2: TIENE HISTORIAL
+    let hayActiva = false;
+    tbody.innerHTML = "";
+
+    asignaciones.forEach(asig => {
+        // Formateo de fecha
+        const fecha = new Date(asig.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+        const nombre = asig.rutinas ? asig.rutinas.nombre : '(Rutina Eliminada)';
+        const desc = asig.rutinas?.descripcion || "Sin descripción";
+
+        if (asig.activa) {
+            hayActiva = true;
+            // A. PINTAMOS LA TARJETA HERO (Premium)
+            contenedorHero.innerHTML = `
+                <div class="card-rutina-hero p-4 text-center">
+                    <div class="badge bg-black text-warning border border-warning rounded-pill mb-3 px-3 py-2 small">
+                        <i class="bi bi-star-fill me-1"></i> RUTINA ACTIVA
+                    </div>
+                    <h2 class="text-white fw-bold text-glow mb-1">${nombre}</h2>
+                    <p class="text-secondary small mb-4" style="max-width: 400px; margin: 0 auto;">${desc}</p>
+                    
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-warning fw-bold rounded-pill px-4 shadow-sm" onclick="abrirModalAsignarDesdeFicha()">
+                            <i class="bi bi-arrow-repeat me-2"></i>Cambiar Plan
+                        </button>
+                    </div>
+                </div>`;
+            
+            // También la agregamos al historial (destacada)
+            tbody.innerHTML += `
+                <tr class="fila-activa">
+                    <td class="text-warning fw-bold ps-4 py-3"><i class="bi bi-caret-right-fill me-2"></i>${fecha}</td>
+                    <td class="text-white fw-bold py-3">${nombre}</td>
+                    <td class="text-end pe-4 py-3"><span class="badge-status active"><i class="bi bi-check-circle-fill"></i>ACTIVA</span></td>
+                </tr>`;
+        } else {
+            // B. PINTAMOS FILA DE HISTORIAL (Sutil)
+            tbody.innerHTML += `
+                <tr>
+                    <td class="text-secondary ps-4 py-3">${fecha}</td>
+                    <td class="text-secondary py-3">${nombre}</td>
+                    <td class="text-end pe-4 py-3"><span class="badge-status archived">Archivada</span></td>
+                </tr>`;
+        }
+    });
+
+    // CASO 3: TIENE HISTORIAL PERO NINGUNA ACTIVA (PAUSADO)
+    if (!hayActiva) {
+        contenedorHero.innerHTML = `
+            <div class="card bg-dark border border-danger p-4 text-center rounded-4 shadow-sm">
+                <div class="text-danger mb-2"><i class="bi bi-exclamation-circle fs-2"></i></div>
+                <h4 class="text-white">Cliente en Pausa</h4>
+                <p class="text-muted small">No tiene ninguna rutina activa actualmente.</p>
+                <button class="btn btn-outline-danger fw-bold rounded-pill px-4 mt-2" onclick="abrirModalAsignarDesdeFicha()">
+                    Reactivar con Rutina
+                </button>
+            </div>`;
+    }
+}
+
+function abrirModalAsignarDesdeFicha() {
+    const nombre = document.getElementById('ficha-nombre').innerText;
+    abrirModalAsignar(idClienteSeleccionado, nombre);
+}
+
+// ASIGNACIÓN MODAL
 async function abrirModalAsignar(clienteId, nombreCliente) {
     document.getElementById('idClienteAsignar').value = clienteId;
     document.getElementById('nombreClienteAsignar').innerText = nombreCliente;
@@ -596,7 +823,7 @@ async function abrirModalAsignar(clienteId, nombreCliente) {
     selRutina.innerHTML = '';
     rutinas.forEach(r => selRutina.innerHTML += `<option value="${r.id}">${r.nombre}</option>`);
     
-    // Cargar recursos (Receta/Sugerencia)
+    // Recursos
     const { data: recursos } = await clienteSupabase.from('recursos').select('id, nombre, tipo');
     const selReceta = document.getElementById('selectReceta'); selReceta.innerHTML = '<option value="">-- Ninguna --</option>';
     const selSug = document.getElementById('selectSugerencia'); selSug.innerHTML = '<option value="">-- Ninguno --</option>';
@@ -624,7 +851,6 @@ async function guardarAsignacion() {
     const modal = bootstrap.Modal.getInstance(el);
     if(modal) modal.hide();
     
-    // Si estamos en la ficha, refrescamos la info ahí, sino en la tabla
     if(!document.getElementById('vista-ficha-cliente').classList.contains('d-none')) {
         cargarRutinaActualCRM(clienteId);
     } else {
@@ -633,18 +859,396 @@ async function guardarAsignacion() {
     Toast.fire({ icon: 'success', title: 'Asignado' });
 }
 
-// PREVISUALIZAR, RECURSOS Y MENU
-async function previsualizarRutina(id) { /* ... (Igual que antes) ... */ 
+// OTROS
+async function cargarRecursos() {
+    const contenedor = document.getElementById('contenedor-recursos');
+    contenedor.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-warning"></div></div>';
+    const { data: recursos } = await clienteSupabase.from('recursos').select('*').order('created_at', { ascending: false });
+    contenedor.innerHTML = '';
+    if (!recursos || recursos.length === 0) return contenedor.innerHTML = '<p class="text-muted text-center col-12">No hay archivos.</p>';
+    recursos.forEach(r => {
+        const icono = r.tipo === 'receta' ? 'bi-egg-fried text-success' : 'bi-lightbulb text-info';
+        const borde = r.tipo === 'receta' ? 'border-success' : 'border-info';
+        contenedor.innerHTML += `<div class="col-md-4 mb-3"><div class="card bg-dark-subtle border-start border-4 ${borde} h-100 shadow-sm"><div class="card-body d-flex align-items-center"><i class="bi ${icono} fs-1 me-3"></i><div class="flex-grow-1 overflow-hidden"><h6 class="text-white mb-1 text-truncate">${r.nombre}</h6><a href="${r.archivo_url}" target="_blank" class="small text-warning text-decoration-none">Ver archivo</a></div><button class="btn btn-sm btn-outline-danger ms-2" onclick="borrarRecurso(${r.id})"><i class="bi bi-trash"></i></button></div></div></div>`;
+    });
+}
+function abrirModalRecurso() {
+    document.getElementById('form-recurso').reset();
+    document.getElementById('status-recurso').classList.add('d-none');
+    new bootstrap.Modal(document.getElementById('modalRecurso')).show();
+}
+async function guardarRecurso() {
+    const nombre = document.getElementById('nombreRecurso').value;
+    const tipo = document.getElementById('tipoRecurso').value;
+    const input = document.getElementById('fileRecurso');
+    if (!nombre || input.files.length === 0) return Toast.fire({ icon: 'warning', title: 'Faltan datos' });
+    document.getElementById('status-recurso').classList.remove('d-none');
+    try {
+        const archivo = input.files[0];
+        const ext = archivo.name.split('.').pop();
+        const path = `${tipo}_${Date.now()}.${ext}`;
+        await clienteSupabase.storage.from('materiales').upload(path, archivo);
+        const { data: urlData } = clienteSupabase.storage.from('materiales').getPublicUrl(path);
+        await clienteSupabase.from('recursos').insert([{ nombre: nombre, tipo: tipo, archivo_url: urlData.publicUrl }]);
+        const el = document.getElementById('modalRecurso');
+        const modal = bootstrap.Modal.getInstance(el);
+        if (modal) modal.hide();
+        cargarRecursos();
+        Toast.fire({ icon: 'success', title: 'Recurso subido' });
+    } catch (error) { Toast.fire({ icon: 'error', title: 'Error', text: error.message }); }
+    finally { document.getElementById('status-recurso').classList.add('d-none'); }
+}
+async function borrarRecurso(id) {
+    if(!(await Popup.fire({ title: '¿Borrar?', icon: 'warning', confirmButtonText: 'Sí' })).isConfirmed) return;
+    await clienteSupabase.from('recursos').delete().eq('id', id);
+    cargarRecursos();
+    Toast.fire({ icon: 'success', title: 'Eliminado' });
+}
+function toggleMenu() {
+    document.querySelector('.sidebar').classList.toggle('active');
+    document.body.classList.toggle('menu-open');
+}
+async function previsualizarRutina(id) {
     const modal = new bootstrap.Modal(document.getElementById('modalPrevisualizar'));
     modal.show();
-    // (Por brevedad omito el body, usa el que tenías, funciona igual)
-} 
-// (Mantén tus funciones de Recursos y toggleMenu aquí al final)
-async function cargarRecursos() { /* ... */ }
-function abrirModalRecurso() { /* ... */ }
-async function guardarRecurso() { /* ... */ }
-async function borrarRecurso(id) { /* ... */ }
-function toggleMenu() { document.querySelector('.sidebar').classList.toggle('active'); document.body.classList.toggle('menu-open'); }
+    document.getElementById('contenido-preview').innerHTML = '<div class="text-center py-5"><div class="spinner-border text-info"></div></div>';
+    const { data: detalles } = await clienteSupabase.from('rutinas_detalles').select(`*, rutinas_dias!inner ( dia_numero, rutinas ( nombre, descripcion ) ), ejercicios_catalogo ( nombre, imagen_url )`).eq('rutinas_dias.rutina_id', id).order('orden_ejercicio', { ascending: true }).order('orden_serie', { ascending: true });
+    if (!detalles || detalles.length === 0) return document.getElementById('contenido-preview').innerHTML = '<p class="text-center text-danger">Vacía.</p>';
+    document.getElementById('tituloPreview').innerText = detalles[0].rutinas_dias.rutinas.nombre;
+    let datosPreview = {}; 
+    detalles.forEach(d => { const numDia = d.rutinas_dias.dia_numero; if (!datosPreview[numDia]) datosPreview[numDia] = []; datosPreview[numDia].push(d); });
+    const contenedorTabs = document.getElementById('tabs-dias-preview');
+    contenedorTabs.innerHTML = '';
+    Object.keys(datosPreview).sort().forEach((dia, index) => {
+        const btn = document.createElement('button');
+        btn.className = index === 0 ? 'btn btn-warning fw-bold btn-sm' : 'btn btn-outline-secondary btn-sm';
+        btn.innerText = `Día ${dia}`;
+        btn.onclick = () => { Array.from(contenedorTabs.children).forEach(b => b.className = 'btn btn-outline-secondary btn-sm'); btn.className = 'btn btn-warning fw-bold btn-sm'; renderizarDiaPreview(datosPreview[dia]); };
+        contenedorTabs.appendChild(btn);
+    });
+    renderizarDiaPreview(datosPreview[Object.keys(datosPreview)[0]]);
+}
+function renderizarDiaPreview(ejercicios) {
+    const contenedor = document.getElementById('contenido-preview');
+    contenedor.innerHTML = '';
+    let tarjetaActualIdx = null;
+    let html = '';
+    ejercicios.forEach(fila => {
+        if (fila.orden_ejercicio !== tarjetaActualIdx) {
+            if (tarjetaActualIdx !== null) html += `</div></div>`; 
+            tarjetaActualIdx = fila.orden_ejercicio;
+            const img = fila.ejercicios_catalogo.imagen_url ? `<div class="text-center mb-3"><img src="${fila.ejercicios_catalogo.imagen_url}" class="img-fluid rounded" style="max-height: 150px;"></div>` : '';
+            html += `<div class="card-preview p-3 animate__animated animate__fadeIn"><div class="d-flex justify-content-between align-items-center mb-2"><h5 class="m-0 text-white">${fila.ejercicios_catalogo.nombre}</h5><span class="badge-preview">#${fila.orden_ejercicio}</span></div>${img}<div class="lista-series">`;
+        }
+        html += `<div class="fila-serie-preview row align-items-center text-white"><div class="col-6"><span class="badge ${fila.tipo_serie === 'calentamiento' ? 'bg-secondary' : 'bg-success'} mb-1">${fila.tipo_serie}</span><div class="fw-bold">${fila.reps_objetivo} <span class="text-muted fw-normal">reps</span></div></div><div class="col-6 text-end"><span class="text-muted small">${fila.descanso_info || ''}</span></div></div>`;
+    });
+    if (ejercicios.length > 0) html += `</div></div>`;
+    contenedor.innerHTML = html;
+}
+
+// ==========================================
+//      7. MÓDULO FINANZAS (CAJA GENERAL)
+// ==========================================
+
+// EN js/admin.js
+
+async function cargarModuloFinanzas() {
+    const tbody = document.getElementById('tabla-caja');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-warning"></div> Cargando...</td></tr>';
+
+    // 1. Obtener Fechas
+    let fechaDesde = document.getElementById('filtro-fecha-desde').value;
+    let fechaHasta = document.getElementById('filtro-fecha-hasta').value;
+    const hoy = new Date();
+    document.getElementById('finanzas-fecha-hoy').innerText = hoy.toLocaleDateString();
+
+    if (!fechaDesde) {
+        const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        fechaDesde = primerDia.toISOString().split('T')[0];
+        document.getElementById('filtro-fecha-desde').value = fechaDesde;
+    }
+    if (!fechaHasta) {
+        const manana = new Date(hoy);
+        manana.setDate(manana.getDate() + 1);
+        fechaHasta = manana.toISOString().split('T')[0];
+        document.getElementById('filtro-fecha-hasta').value = fechaHasta;
+    }
+
+    // 2. Traer Datos
+    const { data: extras } = await clienteSupabase.from('movimientos_caja').select('*').gte('fecha_movimiento', fechaDesde).lte('fecha_movimiento', fechaHasta);
+    const { data: cuotas } = await clienteSupabase.from('pagos_historial').select('*, perfiles(nombre)').gte('fecha_pago', fechaDesde).lte('fecha_pago', fechaHasta);
+
+    // 3. Unificar
+    let listaUnificada = [];
+
+    if (extras) {
+        extras.forEach(m => {
+            listaUnificada.push({
+                fecha: new Date(m.fecha_movimiento),
+                detalle: m.descripcion || '-',
+                categoria: m.categoria,
+                monto: parseFloat(m.monto),
+                tipo: m.tipo,
+                metodo: m.metodo_pago,
+                es_cuota: false,
+                id_origen: m.id
+            });
+        });
+    }
+
+    if (cuotas) {
+        cuotas.forEach(c => {
+            listaUnificada.push({
+                fecha: new Date(c.fecha_pago),
+                detalle: `Cuota ${c.perfiles.nombre}`,
+                categoria: 'Suscripción',
+                monto: parseFloat(c.monto),
+                tipo: 'ingreso',
+                metodo: c.metodo_pago,
+                es_cuota: true,
+                id_origen: c.id,
+                id_cliente: c.cliente_id // <--- CLAVE: Guardamos el ID del cliente
+            });
+        });
+    }
+
+    listaUnificada.sort((a, b) => b.fecha - a.fecha);
+
+    // 4. Totales y Render
+    let totalIngresos = 0, totalEgresos = 0;
+    tbody.innerHTML = '';
+
+    if (listaUnificada.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No hay movimientos en estas fechas.</td></tr>';
+    } else {
+        listaUnificada.forEach(item => {
+            if (item.tipo === 'ingreso') totalIngresos += item.monto;
+            else totalEgresos += item.monto;
+
+            const colorMonto = item.tipo === 'egreso' ? 'text-danger' : 'text-success';
+            const signo = item.tipo === 'egreso' ? '-' : '+';
+            
+            let iconCat = '';
+            if (item.es_cuota) iconCat = '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary"><i class="bi bi-person-check me-1"></i>Cuota</span>';
+            else if (item.tipo === 'egreso') iconCat = '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger"><i class="bi bi-arrow-down"></i> Gasto</span>';
+            else iconCat = '<span class="badge bg-success bg-opacity-25 text-success border border-success"><i class="bi bi-arrow-up"></i> Extra</span>';
+
+            // --- LÓGICA DEL BOTÓN DE ACCIÓN ---
+            let btnAccion = '';
+            if (item.es_cuota) {
+                // AQUÍ ESTÁ EL CAMBIO: Botón funcional para ir al cliente
+                btnAccion = `
+                    <button class="btn btn-sm btn-link text-info text-decoration-none p-0" onclick="abrirFichaCliente('${item.id_cliente}')">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Ver Cliente
+                    </button>`;
+            } else {
+                btnAccion = `<button class="btn btn-sm text-danger" onclick="borrarMovimientoCaja(${item.id_origen})"><i class="bi bi-trash"></i></button>`;
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td class="ps-3 text-secondary" style="font-size: 0.85rem;">
+                        ${item.fecha.toLocaleDateString()} <br> 
+                        <span class="text-muted" style="font-size: 0.7rem;">${item.fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    </td>
+                    <td class="text-white">
+                        ${item.detalle} <br> 
+                        <span class="badge bg-dark border border-secondary text-secondary" style="font-size:0.6rem">${item.metodo}</span>
+                    </td>
+                    <td>${iconCat} <span class="small ms-1 text-secondary">${item.categoria}</span></td>
+                    <td class="text-end pe-3 fw-bold ${colorMonto}">${signo}$${item.monto.toLocaleString()}</td>
+                    <td class="text-end pe-3">${btnAccion}</td>
+                </tr>`;
+        });
+    }
+
+    document.getElementById('box-total-ingresos').innerText = `$${totalIngresos.toLocaleString()}`;
+    document.getElementById('box-total-egresos').innerText = `$${totalEgresos.toLocaleString()}`;
+    const balance = totalIngresos - totalEgresos;
+    const elBalance = document.getElementById('box-balance');
+    elBalance.innerText = `$${balance.toLocaleString()}`;
+    elBalance.className = balance >= 0 ? 'text-success fw-bold m-0' : 'text-danger fw-bold m-0';
+}
+
+async function guardarMovimientoCaja() {
+    const tipo = document.querySelector('input[name="tipoMov"]:checked').value;
+    const categoria = document.getElementById('caja-categoria').value;
+    const desc = document.getElementById('caja-desc').value;
+    const monto = document.getElementById('caja-monto').value;
+    const metodo = document.getElementById('caja-metodo').value;
+
+    if (!monto || monto <= 0) return Toast.fire({ icon: 'warning', title: 'Monto incorrecto' });
+    if (!desc) return Toast.fire({ icon: 'warning', title: 'Falta descripción' });
+
+    const { error } = await clienteSupabase.from('movimientos_caja').insert([{
+        tipo: tipo,
+        categoria: categoria,
+        descripcion: desc,
+        monto: monto,
+        metodo_pago: metodo
+    }]);
+
+    if (error) {
+        Toast.fire({ icon: 'error', title: 'Error', text: error.message });
+    } else {
+        Toast.fire({ icon: 'success', title: 'Registrado' });
+        // Limpiar form
+        document.getElementById('caja-desc').value = "";
+        document.getElementById('caja-monto').value = "";
+        cargarModuloFinanzas(); // Recargar para ver el nuevo balance
+    }
+}
+
+async function borrarMovimientoCaja(id) {
+    if(!(await Popup.fire({ title: '¿Borrar movimiento?', icon: 'warning', confirmButtonText: 'Sí, borrar' })).isConfirmed) return;
+    
+    const { error } = await clienteSupabase.from('movimientos_caja').delete().eq('id', id);
+    
+    if (error) Toast.fire({ icon: 'error', title: 'Error', text: error.message });
+    else {
+        Toast.fire({ icon: 'success', title: 'Eliminado' });
+        cargarModuloFinanzas();
+    }
+}
+
+// ==========================================
+//      8. MÓDULO REPORTES (BI)
+// ==========================================
+
+let chartClientesInstance = null;
+let chartFinanzasInstance = null;
+
+async function generarReportes() {
+    const fechaDesde = document.getElementById('rep-desde').value;
+    const fechaHasta = document.getElementById('rep-hasta').value;
+    
+    document.getElementById('rango-fechas-txt').innerText = `Del ${new Date(fechaDesde).toLocaleDateString()} al ${new Date(fechaHasta).toLocaleDateString()}`;
+
+    // --- A. ANÁLISIS DE CLIENTES (Snapshot Actual) ---
+    const { data: clientes } = await clienteSupabase.from('perfiles').select('fecha_vencimiento_pago').eq('rol', 'cliente');
+    
+    let activos = 0, porVencer = 0, vencidos = 0;
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+    if (clientes) {
+        clientes.forEach(c => {
+            if (c.fecha_vencimiento_pago) {
+                const vence = new Date(c.fecha_vencimiento_pago + 'T00:00:00');
+                const diff = Math.ceil((vence - hoy) / (1000 * 60 * 60 * 24));
+                
+                if (diff > 7) activos++;
+                else if (diff >= 0) porVencer++; // Entre 0 y 7 días
+                else vencidos++; // Negativo (Vencido)
+            } else {
+                vencidos++; // Nunca pagó
+            }
+        });
+    }
+
+    // Actualizar KPIs Clientes
+    document.getElementById('kpi-activos').innerText = activos;
+    document.getElementById('kpi-vencer').innerText = porVencer;
+    document.getElementById('kpi-morosos').innerText = vencidos;
+
+    // Renderizar Gráfico Torta
+    renderChartClientes(activos, porVencer, vencidos);
+
+
+    // --- B. ANÁLISIS FINANCIERO (Por Fechas) ---
+    // 1. Ingresos por Cuotas
+    const { data: cuotas } = await clienteSupabase
+        .from('pagos_historial')
+        .select('monto')
+        .gte('fecha_pago', fechaDesde)
+        .lte('fecha_pago', fechaHasta);
+
+    // 2. Caja (Ingresos Extra y Egresos)
+    const { data: caja } = await clienteSupabase
+        .from('movimientos_caja')
+        .select('monto, tipo')
+        .gte('fecha_movimiento', fechaDesde)
+        .lte('fecha_movimiento', fechaHasta);
+
+    let totalCuotas = 0;
+    if (cuotas) cuotas.forEach(c => totalCuotas += parseFloat(c.monto));
+
+    let totalExtras = 0;
+    let totalGastos = 0;
+    if (caja) {
+        caja.forEach(m => {
+            if (m.tipo === 'ingreso') totalExtras += parseFloat(m.monto);
+            else totalGastos += parseFloat(m.monto);
+        });
+    }
+
+    const totalIngresos = totalCuotas + totalExtras;
+    const balance = totalIngresos - totalGastos;
+
+    // Actualizar KPIs Financieros
+    document.getElementById('kpi-ingresos').innerText = `$${totalIngresos.toLocaleString()}`;
+    document.getElementById('kpi-egresos').innerText = `$${totalGastos.toLocaleString()}`;
+    
+    const elBal = document.getElementById('kpi-balance');
+    elBal.innerText = `$${balance.toLocaleString()}`;
+    elBal.className = balance >= 0 ? 'text-white fw-bold my-2' : 'text-danger fw-bold my-2';
+
+    // Renderizar Gráfico Barras
+    renderChartFinanzas(totalCuotas, totalExtras, totalGastos);
+}
+
+// --- RENDERS DE GRÁFICOS (CHART.JS) ---
+
+function renderChartClientes(activos, warning, danger) {
+    const ctx = document.getElementById('chart-clientes').getContext('2d');
+    if (chartClientesInstance) chartClientesInstance.destroy(); // Limpiar anterior
+
+    chartClientesInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Activos', 'Por Vencer', 'Vencidos'],
+            datasets: [{
+                data: [activos, warning, danger],
+                backgroundColor: ['#198754', '#ffc107', '#dc3545'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            cutout: '70%'
+        }
+    });
+}
+
+function renderChartFinanzas(cuotas, extras, gastos) {
+    const ctx = document.getElementById('chart-finanzas').getContext('2d');
+    if (chartFinanzasInstance) chartFinanzasInstance.destroy();
+
+    chartFinanzasInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Cuotas', 'Extras', 'Gastos'],
+            datasets: [{
+                label: 'Monto ($)',
+                data: [cuotas, extras, gastos],
+                backgroundColor: ['#0d6efd', '#198754', '#dc3545'],
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                x: { grid: { display: false }, ticks: { color: '#fff' } }
+            }
+        }
+    });
+}
 
 // INICIO
-document.addEventListener('DOMContentLoaded', () => { verificarAdmin(); });
+document.addEventListener('DOMContentLoaded', () => {
+    verificarAdmin();
+});

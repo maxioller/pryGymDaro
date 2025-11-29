@@ -477,3 +477,174 @@ body {
 .text-dimmed {
     color: rgba(255, 255, 255, 0.4);
 }
+
+/* --- ESTILOS DASHBOARD (MEJORA VISUAL) --- */
+
+.card-dashboard {
+    background-color: #1e2126; /* El mismo gris elegante de las tablas */
+    border: 1px solid rgba(255, 255, 255, 0.05); /* Borde muy sutil */
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    height: 100%;
+    overflow: hidden;
+}
+
+.card-dashboard .card-header {
+    background-color: rgba(255, 255, 255, 0.02); /* Ligeramente más claro */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 15px 20px;
+}
+
+.card-dashboard .card-body {
+    padding: 0; /* Para que la lista/tabla ocupe todo */
+}
+
+/* Ajuste para la tabla dentro del dashboard */
+.card-dashboard .table {
+    margin-bottom: 0;
+}
+.card-dashboard .table td {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.card-dashboard .table tr:last-child td {
+    border-bottom: none;
+}
+
+/* =============================================
+   FIX: ESTILOS DE PREVISUALIZACIÓN (MODAL)
+   ============================================= */
+
+/* El contenedor de la tarjeta dentro del modal */
+.card-preview {
+    background-color: #1e2126; /* El mismo gris de las tarjetas */
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    position: relative; /* Para posicionar elementos */
+}
+
+/* El número de ejercicio (#1, #2) */
+.badge-preview {
+    background: linear-gradient(45deg, #ffc107, #ffdb4d);
+    color: #000;
+    font-weight: 800;
+    padding: 6px 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(255, 193, 7, 0.3);
+    font-size: 0.9rem;
+}
+
+/* Las filas de series (Reps, Kilos) */
+.fila-serie-preview {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 12px 0;
+}
+
+.fila-serie-preview:last-child {
+    border-bottom: none;
+}
+
+/* Ajuste de badges internos (Trabajo/Calentamiento) */
+.fila-serie-preview .badge {
+    font-size: 0.65em;
+    padding: 5px 8px;
+    margin-bottom: 4px;
+    display: inline-block;
+}
+
+/* Texto de descanso o notas */
+.text-muted.small {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+/* =============================================
+   ESTILOS SECCIÓN REPORTES (PREMIUM DARK)
+   ============================================= */
+
+/* Tarjetas de KPIs Financieros (Texto) */
+.card-report-dark {
+    background-color: #1e2126; /* El mismo gris elegante usado en tablas */
+    border: 1px solid rgba(255, 255, 255, 0.08); /* Borde sutil */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2); /* Sombra suave */
+    transition: transform 0.2s ease;
+}
+.card-report-dark:hover {
+    transform: translateY(-2px); /* Pequeño efecto al pasar el mouse */
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Contenedores de Gráficos (con degradado para profundidad) */
+.card-chart-container {
+    /* Degradado sutil de arriba hacia abajo */
+    background: linear-gradient(180deg, #2a2e35 0%, #1e2126 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px; /* Bordes más redondeados */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); /* Sombra más profunda */
+    overflow: hidden;
+    height: 100%;
+}
+
+/* Ajuste para el cuerpo de las tarjetas de gráficos */
+.card-chart-container .card-body {
+    position: relative;
+    z-index: 1; /* Asegura que el gráfico esté sobre el fondo */
+}
+
+/* --- ESTILOS NEÓN PARA FINANZAS --- */
+
+/* 1. Tarjeta Balance Neón (CENTRADO PERFECTO) */
+.card-balance-neon {
+    background-color: #1e2126; 
+    border: 2px solid #ffc107; 
+    border-radius: 16px;
+    height: 100%;
+    box-shadow: 0 0 20px rgba(255, 193, 7, 0.15); 
+    
+    /* Flexbox para centrar absoluto */
+    display: flex;
+    flex-direction: column;
+    justify-content: center !important; /* Centrado Vertical */
+    align-items: center !important;     /* Centrado Horizontal */
+    text-align: center;
+    padding: 20px; /* Espacio interno seguro */
+}
+
+/* Título */
+.card-balance-neon .label-neon {
+    color: #ffc107 !important;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px; /* Un poco más de aire en las letras */
+    margin-bottom: 8px;  /* Separación con el número */
+    text-shadow: 0 0 10px rgba(255, 193, 7, 0.4);
+    display: block; /* Asegura que ocupe su propia línea */
+}
+
+/* Número */
+.card-balance-neon h2 {
+    margin: 0; /* Quitamos márgenes extraños */
+    line-height: 1; /* Para que no tenga espacio extra arriba/abajo */
+    font-size: 2.5rem; /* Un poco más grande para impactar */
+}
+
+/* 2. Botón Registrar Neón */
+.btn-neon-yellow {
+    background: #ffc107;
+    background: linear-gradient(45deg, #ffc107, #ffdb4d);
+    color: #000;
+    font-weight: 900; /* Extra negrita */
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    /* La magia del neón: */
+    box-shadow: 0 0 15px rgba(255, 193, 7, 0.5); 
+    transition: all 0.3s ease;
+}
+
+.btn-neon-yellow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(255, 193, 7, 0.8); /* Más brillo al pasar mouse */
+    background: #ffdb4d;
+}

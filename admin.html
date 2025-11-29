@@ -10,7 +10,7 @@
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="css/admin.css">
@@ -40,9 +40,16 @@
 
             <ul class="nav nav-pills flex-column mb-auto">
                 <li class="nav-item">
+                    <a href="#" class="nav-link text-white link-opacity-75-hover" id="btn-nav-dashboard"
+                        onclick="cambiarVista('dashboard')">
+                        <i class="bi bi-speedometer2 me-2"></i>
+                        Inicio
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="#" class="nav-link active bg-warning text-dark fw-bold" id="btn-nav-ejercicios"
                         onclick="cambiarVista('ejercicios')">
-                        <i class="bi bi-dumbbell me-2"></i>
+                        <i class="bi bi-activity me-2"></i>
                         Ejercicios
                     </a>
                 </li>
@@ -67,6 +74,18 @@
                         Recursos
                     </a>
                 </li>
+                <li>
+                    <a href="#" class="nav-link text-white link-opacity-75-hover" id="btn-nav-finanzas"
+                        onclick="cambiarVista('finanzas')">
+                        <i class="bi bi-wallet2 me-2"></i> Finanzas
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link text-white link-opacity-75-hover" id="btn-nav-reportes"
+                        onclick="cambiarVista('reportes')">
+                        <i class="bi bi-bar-chart-line me-2"></i> Reportes
+                    </a>
+                </li>
             </ul>
 
             <hr class="border-secondary">
@@ -84,10 +103,113 @@
                     <li><button class="dropdown-item text-danger" id="btn-logout">Cerrar Sesión</button></li>
                 </ul>
             </div>
+
         </aside>
 
         <main class="content-wrapper w-100 p-4">
+            <section id="vista-dashboard" class="animate__animated animate__fadeIn">
 
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+                    <div>
+                        <h2 class="fw-bold m-0">Panel de Control</h2>
+                        <p class="text-muted small m-0">Resumen de tu negocio.</p>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-secondary d-block" id="dash-fecha">...</small>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-dark-subtle border-0 shadow-sm h-100 border-start border-4 border-success">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-secondary fw-bold m-0" style="font-size: 0.8rem;">INGRESOS (MES)
+                                    </h6>
+                                    <div class="bg-success bg-opacity-10 p-2 rounded">
+                                        <i class="bi bi-currency-dollar fs-5 text-success"></i>
+                                    </div>
+                                </div>
+                                <h2 class="text-white fw-bold mb-0" id="dash-ingresos">$0</h2>
+                                <small class="text-secondary" id="dash-pagos-count">0 pagos registrados</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card bg-dark-subtle border-0 shadow-sm h-100 border-start border-4 border-primary">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-secondary fw-bold m-0" style="font-size: 0.8rem;">CLIENTES ACTIVOS
+                                    </h6>
+                                    <div class="bg-primary bg-opacity-10 p-2 rounded">
+                                        <i class="bi bi-people-fill fs-5 text-primary"></i>
+                                    </div>
+                                </div>
+                                <h2 class="text-white fw-bold mb-0" id="dash-activos">0</h2>
+                                <small class="text-secondary" id="dash-total-clientes">De 0 registrados</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card bg-warning bg-opacity-10 border-0 shadow-sm h-100 border-start border-4 border-warning cursor-pointer"
+                            onclick="cambiarVista('clientes')" style="cursor: pointer; transition: transform 0.2s;">
+                            <div
+                                class="card-body d-flex flex-column justify-content-center align-items-center text-center">
+                                <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center mb-2"
+                                    style="width: 40px; height: 40px;">
+                                    <i class="bi bi-person-plus-fill fs-5"></i>
+                                </div>
+                                <h6 class="text-white fw-bold m-0">Gestionar Clientes</h6>
+                                <small class="text-warning">Ir al módulo</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card-dashboard">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="text-white m-0 d-flex align-items-center">
+                                    <i class="bi bi-cake2 me-2 text-danger"></i> Cumpleaños del Mes
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group list-group-flush bg-transparent" id="lista-cumples">
+                                    <div class="p-5 text-center text-muted">
+                                        <i class="bi bi-calendar-event fs-1 opacity-25 d-block mb-2"></i>
+                                        <span class="small">Cargando...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card-dashboard">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="text-white m-0 d-flex align-items-center">
+                                    <i class="bi bi-wallet2 me-2 text-success"></i> Últimas Transacciones
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-borderless table-hover mb-0 small align-middle"
+                                        style="color: #ccc;">
+                                        <tbody id="dash-tabla-pagos">
+                                            <tr>
+                                                <td class="p-5 text-center text-muted">Cargando...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
             <section id="vista-ejercicios" class="animate__animated animate__fadeIn">
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
                     <div>
@@ -257,6 +379,16 @@
                     <div class="tab-pane fade show active" id="tab-perfil">
                         <div class="card bg-dark-subtle border-0 p-4">
                             <div class="row g-3">
+
+                                <div class="col-md-12">
+                                    <div
+                                        class="alert alert-dark border-secondary d-flex align-items-center py-2 px-3 mb-0">
+                                        <i class="bi bi-calendar-check text-warning me-2"></i>
+                                        <small class="text-secondary me-2">MIEMBRO DESDE:</small>
+                                        <strong class="text-white" id="crm-fecha-alta">Cargando...</strong>
+                                    </div>
+                                </div>
+
                                 <div class="col-md-6">
                                     <label class="text-secondary small fw-bold">TELÉFONO</label>
                                     <input type="text" id="crm-telefono"
@@ -347,6 +479,7 @@
                                                 <th>Fecha</th>
                                                 <th>Detalle</th>
                                                 <th>Monto</th>
+                                                <th class="text-end"></th>
                                             </tr>
                                         </thead>
                                         <tbody id="tabla-historial-pagos"></tbody>
@@ -358,16 +491,13 @@
 
                     <div class="tab-pane fade" id="tab-rutina">
 
-                        <div class="card bg-dark-subtle border-0 p-4 text-center mb-4">
-                            <span class="badge bg-warning text-dark mb-2 align-self-center mx-auto">ACTUALMENTE</span>
-                            <h3 class="text-white" id="crm-rutina-actual">...</h3>
-                            <button class="btn btn-outline-warning fw-bold mt-3"
-                                onclick="abrirModalAsignarDesdeFicha()">
-                                <i class="bi bi-arrow-repeat me-2"></i>Cambiar Rutina
-                            </button>
+                        <div id="contenedor-rutina-hero">
                         </div>
 
-                        <h6 class="text-secondary mb-3 ps-1">HISTORIAL DE ASIGNACIONES</h6>
+                        <div class="d-flex align-items-center mt-5 mb-3">
+                            <div class="bg-warning rounded-pill me-2" style="width: 4px; height: 18px;"></div>
+                            <h6 class="text-white m-0 tracking-tight">HISTORIAL DE ASIGNACIONES</h6>
+                        </div>
 
                         <div class="card bg-black border border-secondary p-3 card-historial-contenedor">
                             <div class="table-responsive">
@@ -384,6 +514,7 @@
                                 </table>
                             </div>
                         </div>
+
                     </div>
 
                 </div>
@@ -402,6 +533,265 @@
                 <div class="row" id="contenedor-recursos"></div>
             </section>
 
+            <section id="vista-finanzas" class="d-none animate__animated animate__fadeIn">
+
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+                    <div>
+                        <h2 class="fw-bold m-0">Control Financiero</h2>
+                        <p class="text-muted small m-0">Registro de gastos y otros ingresos.</p>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-dark border border-secondary p-2" id="finanzas-fecha-hoy">...</span>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-dark-subtle border-0 shadow-sm border-start border-4 border-success h-100">
+                            <div class="card-body">
+                                <small class="text-secondary fw-bold">TOTAL INGRESOS (MES)</small>
+                                <h2 class="text-success fw-bold m-0" id="box-total-ingresos">$0</h2>
+                                <small class="text-muted" style="font-size: 0.75rem;">(Cuotas + Aportes)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-dark-subtle border-0 shadow-sm border-start border-4 border-danger h-100">
+                            <div class="card-body">
+                                <small class="text-secondary fw-bold">TOTAL GASTOS (MES)</small>
+                                <h2 class="text-danger fw-bold m-0" id="box-total-egresos">$0</h2>
+                                <small class="text-muted" style="font-size: 0.75rem;">(Servicios,
+                                    Mantenimiento...)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card-balance-neon">
+                            <small class="label-neon">BALANCE NETO</small>
+                            <h2 class="text-white fw-bold" id="box-balance">$0</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4 mb-4">
+                        <div class="card card-dashboard">
+                            <div class="card-header border-secondary bg-transparent">
+                                <h6 class="text-white m-0"><i class="bi bi-plus-circle me-2"></i>Nuevo Movimiento</h6>
+                            </div>
+                            <div class="card-body">
+                                <form onsubmit="event.preventDefault(); guardarMovimientoCaja()">
+                                    <div class="mb-3">
+                                        <label class="small text-secondary fw-bold mb-1">TIPO</label>
+                                        <div class="btn-group w-100" role="group">
+                                            <input type="radio" class="btn-check" name="tipoMov" id="tipoIngreso"
+                                                value="ingreso" autocomplete="off">
+                                            <label class="btn btn-outline-success" for="tipoIngreso">Ingreso
+                                                Extra</label>
+
+                                            <input type="radio" class="btn-check" name="tipoMov" id="tipoEgreso"
+                                                value="egreso" autocomplete="off" checked>
+                                            <label class="btn btn-outline-danger" for="tipoEgreso">Gasto /
+                                                Egreso</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="small text-secondary fw-bold mb-1">CATEGORÍA</label>
+                                        <select id="caja-categoria"
+                                            class="form-select bg-dark text-white border-secondary">
+                                            <option value="Servicios">Servicios (Luz/Agua/Gas)</option>
+                                            <option value="Alquiler">Alquiler</option>
+                                            <option value="Mantenimiento">Mantenimiento / Equipos</option>
+                                            <option value="Limpieza">Limpieza</option>
+                                            <option value="Impuestos">Impuestos</option>
+                                            <option value="Sueldos">Sueldos</option>
+                                            <option value="Aporte Capital">Aporte de Capital (Ingreso)</option>
+                                            <option value="Venta Productos">Venta Productos (Ingreso)</option>
+                                            <option value="Otros">Otros</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="small text-secondary fw-bold mb-1">DESCRIPCIÓN</label>
+                                        <input type="text" id="caja-desc"
+                                            class="form-control bg-dark text-white border-secondary"
+                                            placeholder="Ej: Pago internet Diciembre">
+                                    </div>
+
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="small text-secondary fw-bold mb-1">MONTO ($)</label>
+                                            <input type="number" id="caja-monto"
+                                                class="form-control bg-dark text-white border-secondary fw-bold">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="small text-secondary fw-bold mb-1">MÉTODO</label>
+                                            <select id="caja-metodo"
+                                                class="form-select bg-dark text-white border-secondary"
+                                                style="font-size: 0.8rem;">
+                                                <option value="Efectivo">Efectivo</option>
+                                                <option value="Transferencia">Transferencia</option>
+                                                <option value="Mercado Pago">Mercado Pago</option>
+                                                <option value="Tarjeta">Tarjeta</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-neon-yellow w-100 py-2">
+                                        Registrar Movimiento
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <div class="card bg-dark-subtle border-0 shadow-lg">
+                            <div
+                                class="card-header border-0 bg-transparent d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h6 class="text-white m-0">Movimientos Unificados</h6>
+                                    <small class="text-muted fst-italic">Cuotas de clientes + Caja chica</small>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <input type="date" id="filtro-fecha-desde"
+                                        class="form-control form-control-sm bg-black text-white border-secondary"
+                                        onchange="cargarModuloFinanzas()">
+                                    <input type="date" id="filtro-fecha-hasta"
+                                        class="form-control form-control-sm bg-black text-white border-secondary"
+                                        onchange="cargarModuloFinanzas()">
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-hover mb-0 align-middle small">
+                                        <thead class="text-secondary">
+                                            <tr>
+                                                <th class="ps-3">FECHA</th>
+                                                <th>DETALLE</th>
+                                                <th>CATEGORÍA</th>
+                                                <th class="text-end pe-3">MONTO</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tabla-caja">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <section id="vista-reportes" class="d-none animate__animated animate__fadeIn">
+
+                <div
+                    class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+                    <div class="mb-3 mb-md-0">
+                        <h2 class="fw-bold m-0">Reportes Generales</h2>
+                        <p class="text-muted small m-0">Análisis de rendimiento y estado de clientes.</p>
+                    </div>
+
+                    <div class="d-flex gap-2 align-items-end card-report-dark p-2 rounded px-3">
+                        <div>
+                            <label class="text-secondary small fw-bold" style="font-size: 0.65rem;">DESDE</label>
+                            <input type="date" id="rep-desde"
+                                class="form-control form-control-sm bg-dark text-white border-secondary">
+                        </div>
+                        <div>
+                            <label class="text-secondary small fw-bold" style="font-size: 0.65rem;">HASTA</label>
+                            <input type="date" id="rep-hasta"
+                                class="form-control form-control-sm bg-dark text-white border-secondary">
+                        </div>
+                        <button class="btn btn-sm btn-warning fw-bold" onclick="generarReportes()">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <h6 class="text-secondary mb-3 ps-1 text-uppercase ls-1"><i class="bi bi-people me-2"></i>Estado de la
+                    Cartera (Hoy)</h6>
+                <div class="row g-3 mb-5">
+                    <div class="col-md-3">
+                        <div class="card bg-dark-subtle border-0 border-start border-4 border-success shadow-sm h-100">
+                            <div class="card-body">
+                                <h3 class="fw-bold text-white mb-0" id="kpi-activos">0</h3>
+                                <small class="text-secondary">Clientes Activos</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark-subtle border-0 border-start border-4 border-warning shadow-sm h-100">
+                            <div class="card-body">
+                                <h3 class="fw-bold text-white mb-0" id="kpi-vencer">0</h3>
+                                <small class="text-secondary">Por Vencer (7 días)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark-subtle border-0 border-start border-4 border-danger shadow-sm h-100">
+                            <div class="card-body">
+                                <h3 class="fw-bold text-white mb-0" id="kpi-morosos">0</h3>
+                                <small class="text-secondary">Vencidos / Sin Pago</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-chart-container border-0 h-100">
+                            <div class="card-body p-2 d-flex justify-content-center align-items-center"
+                                style="height: 100px;">
+                                <canvas id="chart-clientes"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="text-secondary mb-3 ps-1 text-uppercase ls-1"><i class="bi bi-cash-stack me-2"></i>Balance
+                    Financiero (Selección)</h6>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card card-report-dark border-0 mb-3">
+                            <div class="card-body d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted d-block">INGRESOS TOTALES</small>
+                                    <span class="fs-4 fw-bold text-success" id="kpi-ingresos">$0</span>
+                                </div>
+                                <i class="bi bi-arrow-up-circle fs-2 text-success opacity-50"></i>
+                            </div>
+                        </div>
+                        <div class="card card-report-dark border-0 mb-3">
+                            <div class="card-body d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted d-block">EGRESOS TOTALES</small>
+                                    <span class="fs-4 fw-bold text-danger" id="kpi-egresos">$0</span>
+                                </div>
+                                <i class="bi bi-arrow-down-circle fs-2 text-danger opacity-50"></i>
+                            </div>
+                        </div>
+                        <div class="card bg-dark-subtle border-top border-4 border-warning">
+                            <div class="card-body text-center">
+                                <small class="text-secondary fw-bold">BALANCE NETO</small>
+                                <h2 class="text-white fw-bold my-2" id="kpi-balance">$0</h2>
+                                <span class="badge bg-dark border border-secondary text-muted"
+                                    id="rango-fechas-txt">...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <div class="card card-chart-container border-0 h-100">
+                            <div class="card-body">
+                                <canvas id="chart-finanzas"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- MODALES -->
             <div class="modal fade" id="modalAsignar" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content bg-dark border-secondary">
@@ -559,6 +949,45 @@
             </div>
 
         </main>
+    </div>
+    <div class="modal fade" id="modalEditarPago" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content bg-dark border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-white">Corregir Pago</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="idPagoEditar">
+
+                    <div class="mb-3">
+                        <label class="small text-secondary fw-bold mb-1">MONTO ($)</label>
+                        <input type="number" id="edit-monto"
+                            class="form-control bg-black text-white border-secondary fw-bold">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small text-secondary fw-bold mb-1">DURACIÓN (MESES)</label>
+                        <input type="number" id="edit-meses" class="form-control bg-black text-white border-secondary">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small text-secondary fw-bold mb-1">MÉTODO</label>
+                        <select id="edit-metodo" class="form-select bg-black text-white border-secondary">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                        data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning btn-sm fw-bold"
+                        onclick="guardarEdicionPago()">Confirmar Cambio</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
