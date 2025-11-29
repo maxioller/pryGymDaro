@@ -5,14 +5,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Gym System</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="css/admin.css">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body class="bg-dark text-light">
+
     <nav class="navbar navbar-dark bg-black border-bottom border-secondary d-md-none sticky-top p-3">
         <div class="d-flex align-items-center w-100 justify-content-between">
             <span class="fw-bold text-warning tracking-tight">GYM SYSTEM</span>
@@ -76,10 +81,6 @@
                     <strong>Admin</strong>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-                    <li><a class="dropdown-item" href="#">Configuración</a></li>
-                    <li>
-                        <hr class="dropdown-divider">
-                    </li>
                     <li><button class="dropdown-item text-danger" id="btn-logout">Cerrar Sesión</button></li>
                 </ul>
             </div>
@@ -111,13 +112,7 @@
                                         <th class="text-end pe-4">Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody id="tabla-ejercicios" class="border-top-0">
-                                    <tr>
-                                        <td colspan="4" class="text-center py-5">
-                                            <div class="spinner-border text-warning"></div>
-                                        </td>
-                                    </tr>
-                                </tbody>
+                                <tbody id="tabla-ejercicios" class="border-top-0"></tbody>
                             </table>
                         </div>
                     </div>
@@ -148,35 +143,33 @@
                                         <th class="text-end pe-4">Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody id="tabla-rutinas">
-                                </tbody>
+                                <tbody id="tabla-rutinas"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </section>
-            <section id="vista-crear-rutina" class="d-none animate__animated animate__fadeIn">
 
+            <section id="vista-crear-rutina" class="d-none animate__animated animate__fadeIn">
                 <div class="d-flex flex-column flex-md-row justify-content-between 
             align-items-start align-items-md-center mb-4 pb-2 border-bottom border-secondary">
-    <div class="w-100 me-md-3">
-        <input type="text" id="nombreNuevaRutina"
-            class="form-control bg-dark text-white fw-bold fs-4 border-0 p-0"
-            placeholder="Nombre de la Rutina (Ej: Hipertrofia 3 Días)">
-        <input type="text" id="descripcionRutina"
-            class="form-control bg-dark text-muted border-0 p-0 mt-1"
-            placeholder="Descripción breve...">
-    </div>
-    <div class="d-flex gap-2 mt-3 mt-md-0">
-        <button class="btn btn-outline-secondary" onclick="cambiarVista('rutinas')">Cancelar</button>
-        <button class="btn btn-success fw-bold" onclick="guardarRutinaCompleta()">
-            <i class="bi bi-save me-1"></i> Guardar Rutina
-        </button>
-    </div>
-</div>
+                    <div class="w-100 me-md-3">
+                        <input type="text" id="nombreNuevaRutina"
+                            class="form-control bg-dark text-white fw-bold fs-4 border-0 p-0"
+                            placeholder="Nombre de la Rutina (Ej: Hipertrofia 3 Días)">
+                        <input type="text" id="descripcionRutina"
+                            class="form-control bg-dark text-muted border-0 p-0 mt-1"
+                            placeholder="Descripción breve...">
+                    </div>
+                    <div class="d-flex gap-2 mt-3 mt-md-0">
+                        <button class="btn btn-outline-secondary" onclick="cambiarVista('rutinas')">Cancelar</button>
+                        <button class="btn btn-success fw-bold" onclick="guardarRutinaCompleta()">
+                            <i class="bi bi-save me-1"></i> Guardar Rutina
+                        </button>
+                    </div>
+                </div>
 
                 <div class="row h-100">
-
                     <div class="col-md-4 border-end border-secondary pe-4">
                         <h5 class="text-warning mb-3"><i class="bi bi-search me-2"></i>Ejercicios Disponibles</h5>
                         <input type="text" id="busquedaEjercicio"
@@ -188,30 +181,26 @@
                     </div>
 
                     <div class="col-md-8 ps-4">
-    <!-- Título Estructura solo en la primera fila -->
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="text-white mb-0">
-            <i class="bi bi-calendar-week me-2"></i>Estructura
-        </h5>
-    </div>
-
-    <!-- Fila aparte para los días -->
-    <div id="tabs-dias" class="d-flex flex-wrap gap-2 mb-3">
-        <!-- Aquí JS sigue generando Día 1, Día 2, + Día, tachito -->
-    </div>
-
-    <div id="contenedor-rutina-builder" class="bg-dark-subtle p-3 rounded border border-secondary"
-        style="min-height: 500px;">
-        ...
-    </div>
-</div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="text-white mb-0">
+                                <i class="bi bi-calendar-week me-2"></i>Estructura
+                            </h5>
+                        </div>
+                        <div id="tabs-dias" class="d-flex flex-wrap gap-2 mb-3">
+                        </div>
+                        <div id="contenedor-rutina-builder" class="bg-dark-subtle p-3 rounded border border-secondary"
+                            style="min-height: 500px;">
+                            ...
+                        </div>
+                    </div>
                 </div>
             </section>
+
             <section id="vista-clientes" class="d-none animate__animated animate__fadeIn">
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
                     <div>
                         <h2 class="fw-bold m-0">Mis Clientes</h2>
-                        <p class="text-muted small m-0">Asigna rutinas a tus alumnos.</p>
+                        <p class="text-muted small m-0">Administra datos, pagos y rutinas.</p>
                     </div>
                 </div>
 
@@ -226,26 +215,191 @@
                                         <th class="text-end pe-4">Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody id="tabla-clientes">
-                                </tbody>
+                                <tbody id="tabla-clientes"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </section>
+
+            <section id="vista-ficha-cliente" class="d-none animate__animated animate__fadeIn">
+
+                <div class="d-flex align-items-center mb-4 border-bottom border-secondary pb-3">
+                    <button class="btn btn-outline-secondary me-3" onclick="cerrarFichaCliente()">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </button>
+                    <div>
+                        <h2 class="fw-bold m-0 text-white" id="ficha-nombre">Nombre Cliente</h2>
+                        <span id="ficha-estado" class="badge bg-secondary">Cargando...</span>
+                    </div>
+                </div>
+
+                <ul class="nav nav-tabs border-secondary mb-4" id="tabsCliente" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active text-white" data-bs-toggle="tab" data-bs-target="#tab-perfil">
+                            <i class="bi bi-person-vcard me-2"></i>Datos Personales
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tab-pagos">
+                            <i class="bi bi-cash-coin me-2 text-success"></i>Suscripción y Pagos
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tab-rutina">
+                            <i class="bi bi-dumbbell me-2 text-warning"></i>Entrenamiento
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+
+                    <div class="tab-pane fade show active" id="tab-perfil">
+                        <div class="card bg-dark-subtle border-0 p-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="text-secondary small fw-bold">TELÉFONO</label>
+                                    <input type="text" id="crm-telefono"
+                                        class="form-control bg-black text-white border-secondary">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="text-secondary small fw-bold">FECHA NACIMIENTO</label>
+                                    <input type="date" id="crm-nacimiento"
+                                        class="form-control bg-black text-white border-secondary">
+                                </div>
+                                <div class="col-12">
+                                    <label class="text-secondary small fw-bold">DIRECCIÓN / LOCALIDAD</label>
+                                    <input type="text" id="crm-direccion"
+                                        class="form-control bg-black text-white border-secondary">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="text-secondary small fw-bold text-danger">CONTACTO EMERGENCIA</label>
+                                    <input type="text" id="crm-emergencia-nombre"
+                                        class="form-control bg-black text-white border-secondary" placeholder="Nombre">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="text-secondary small fw-bold text-danger">TEL. EMERGENCIA</label>
+                                    <input type="text" id="crm-emergencia-tel"
+                                        class="form-control bg-black text-white border-secondary"
+                                        placeholder="Teléfono">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="text-secondary small fw-bold">OBSERVACIONES MÉDICAS /
+                                        GENERALES</label>
+                                    <textarea id="crm-notas" class="form-control bg-black text-white border-secondary"
+                                        rows="3"></textarea>
+                                </div>
+
+                                <div class="col-12 mt-4 text-end">
+                                    <button class="btn btn-warning fw-bold" onclick="guardarDatosCRM()">Guardar
+                                        Datos</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-pagos">
+                        <div class="row">
+                            <div class="col-md-5 mb-4">
+                                <div class="card bg-black border border-secondary p-3">
+                                    <h5 class="text-white mb-3"><i class="bi bi-wallet2 me-2"></i>Registrar Nuevo Pago
+                                    </h5>
+
+                                    <label class="small text-secondary mb-1">MONTO ($)</label>
+                                    <input type="number" id="fin-monto"
+                                        class="form-control bg-dark text-white border-secondary mb-3 fs-4 fw-bold"
+                                        placeholder="0.00">
+
+                                    <label class="small text-secondary mb-1">DURACIÓN</label>
+                                    <select id="fin-meses" class="form-select bg-dark text-white border-secondary mb-3">
+                                        <option value="1">1 Mes</option>
+                                        <option value="2">2 Meses</option>
+                                        <option value="3">3 Meses (Trimestre)</option>
+                                        <option value="6">6 Meses</option>
+                                        <option value="12">1 Año</option>
+                                    </select>
+
+                                    <label class="small text-secondary mb-1">MÉTODO</label>
+                                    <select id="fin-metodo"
+                                        class="form-select bg-dark text-white border-secondary mb-3">
+                                        <option value="Efectivo">Efectivo</option>
+                                        <option value="Transferencia">Transferencia</option>
+                                        <option value="Tarjeta">Tarjeta</option>
+                                    </select>
+
+                                    <button class="btn btn-success w-100 fw-bold py-2" onclick="registrarPago()">
+                                        CONFIRMAR PAGO
+                                    </button>
+
+                                    <hr class="border-secondary my-3">
+                                    <button class="btn btn-outline-danger btn-sm w-100"
+                                        onclick="revocarAcceso()">Revocar Acceso</button>
+                                </div>
+                            </div>
+
+                            <div class="col-md-7">
+                                <h6 class="text-secondary mb-3">HISTORIAL DE TRANSACCIONES</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-sm small">
+                                        <thead>
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>Detalle</th>
+                                                <th>Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tabla-historial-pagos"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-rutina">
+
+                        <div class="card bg-dark-subtle border-0 p-4 text-center mb-4">
+                            <span class="badge bg-warning text-dark mb-2 align-self-center mx-auto">ACTUALMENTE</span>
+                            <h3 class="text-white" id="crm-rutina-actual">...</h3>
+                            <button class="btn btn-outline-warning fw-bold mt-3"
+                                onclick="abrirModalAsignarDesdeFicha()">
+                                <i class="bi bi-arrow-repeat me-2"></i>Cambiar Rutina
+                            </button>
+                        </div>
+
+                        <h6 class="text-secondary mb-3 ps-1">HISTORIAL DE ASIGNACIONES</h6>
+
+                        <div class="card bg-black border border-secondary p-3 card-historial-contenedor">
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover mb-0 small tabla-historial">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-secondary ps-3">FECHA ASIGNACIÓN</th>
+                                            <th class="text-secondary">NOMBRE DE LA RUTINA</th>
+                                            <th class="text-secondary text-end pe-3">ESTADO</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabla-historial-rutinas">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
             <section id="vista-recursos" class="d-none animate__animated animate__fadeIn">
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
                     <div>
                         <h2 class="fw-bold m-0">Biblioteca de Recursos</h2>
-                        <p class="text-muted small m-0">Sube guías y archivos PDF para tus alumnos.</p>
+                        <p class="text-muted small m-0">Sube guías y archivos PDF.</p>
                     </div>
                     <button class="btn btn-warning fw-bold shadow-sm" onclick="abrirModalRecurso()">
                         <i class="bi bi-cloud-upload me-1"></i> Subir Archivo
                     </button>
                 </div>
-
-                <div class="row" id="contenedor-recursos">
-                </div>
+                <div class="row" id="contenedor-recursos"></div>
             </section>
 
             <div class="modal fade" id="modalAsignar" tabindex="-1">
@@ -284,7 +438,7 @@
                     </div>
                 </div>
             </div>
-            <!-- MODAL NUEVO EJERCICIO -->
+
             <div class="modal fade" id="modalNuevoEjercicio" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content bg-dark border-secondary">
@@ -317,17 +471,13 @@
 
                                 <div class="mb-3">
                                     <label class="form-label text-secondary small fw-bold">IMAGEN / GIF</label>
-
                                     <input type="file" id="archivoImagen"
                                         class="form-control bg-black border-secondary text-white mb-2" accept="image/*">
-
                                     <input type="text" id="urlImagen"
                                         class="form-control bg-black border-secondary text-white form-control-sm"
                                         placeholder="O pega una URL externa...">
-
                                     <div id="estado-subida" class="form-text text-warning d-none">
-                                        <span class="spinner-border spinner-border-sm"></span> Subiendo archivo a la
-                                        nube...
+                                        <span class="spinner-border spinner-border-sm"></span> Subiendo archivo...
                                     </div>
                                 </div>
                             </form>
@@ -342,7 +492,7 @@
                     </div>
                 </div>
             </div>
-            <!-- Modal previsualizacion rutina -->
+
             <div class="modal fade" id="modalPrevisualizar" tabindex="-1">
                 <div class="modal-dialog modal-lg modal-dialog-scrollable">
                     <div class="modal-content bg-dark border-secondary">
@@ -353,16 +503,12 @@
                             </div>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
-
                         <div class="modal-body">
-                            <div class="d-flex gap-2 mb-4 overflow-auto pb-2" id="tabs-dias-preview">
-                            </div>
-
+                            <div class="d-flex gap-2 mb-4 overflow-auto pb-2" id="tabs-dias-preview"></div>
                             <div id="contenido-preview">
                                 <div class="text-center text-muted py-5">Cargando...</div>
                             </div>
                         </div>
-
                         <div class="modal-footer border-secondary">
                             <button type="button" class="btn btn-outline-secondary"
                                 data-bs-dismiss="modal">Cerrar</button>
@@ -370,6 +516,7 @@
                     </div>
                 </div>
             </div>
+
             <div class="modal fade" id="modalRecurso" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content bg-dark border-secondary">
@@ -410,10 +557,11 @@
                     </div>
                 </div>
             </div>
+
         </main>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="js/config.js"></script>

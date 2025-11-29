@@ -1,7 +1,10 @@
-// js/app.js - VERSIÓN FINAL INTEGRADA
+// js/app.js - VERSIÓN FINAL (CLIENTE + DEMO + PAGOS + PASSWORD)
+
+// CONFIGURACIÓN
+const WHATSAPP_ENTRENADOR = "2984396698"; // Pon tu número aquí (sin +)
 
 // ==========================================
-//      UTILIDAD: FECHA LOCAL
+//      UTILIDADES
 // ==========================================
 function obtenerFechaLocal() {
     const ahora = new Date();
@@ -26,10 +29,9 @@ function cambiarTab(tabName) {
     const botones = document.querySelectorAll('.nav-item-bottom');
     botones.forEach(btn => {
         btn.classList.remove('active');
-        btn.classList.add('text-secondary'); // Gris por defecto
+        btn.classList.add('text-secondary');
     });
     
-    // Iluminar activo buscando por el onclick
     const activeBtn = Array.from(botones).find(b => b.getAttribute('onclick').includes(tabName));
     if(activeBtn) {
         activeBtn.classList.add('active');
@@ -38,7 +40,6 @@ function cambiarTab(tabName) {
 
     if (tabName === 'progreso') cargarModuloProgreso();
 
-    // Actualizar Header
     const titulos = { 
         'rutina': 'Mi Rutina', 
         'recursos': 'Biblioteca', 
@@ -46,12 +47,10 @@ function cambiarTab(tabName) {
         'perfil': 'Mi Cuenta' 
     };
     
-    // Si estamos en rutina, mostramos el nombre de la rutina (se actualiza luego), si no, el título fijo
     if(tabName !== 'rutina') {
         document.getElementById('titulo-seccion').innerText = titulos[tabName];
     }
 
-    // Cronómetro visible solo en rutina
     const panelTimer = document.getElementById('panel-cronometro');
     if (tabName === 'rutina') {
         panelTimer.classList.remove('d-none');
@@ -63,7 +62,7 @@ function cambiarTab(tabName) {
 
 
 // ==========================================
-//      2. CONFIGURACIÓN, SESIÓN Y AVATAR
+//      2. SESIÓN, AVATAR Y PASSWORD
 // ==========================================
 
 async function verificarSesion() {
@@ -75,7 +74,6 @@ async function verificarSesion() {
     }
 
     const userId = session.user.id;
-    // Traemos también 'avatar_url'
     const { data: perfil } = await clienteSupabase
         .from('perfiles')
         .select('*')
@@ -88,16 +86,13 @@ async function verificarSesion() {
             return;
         }
         
-        // Llenar textos
         document.getElementById('perfil-nombre').innerText = perfil.nombre || "Usuario";
         document.getElementById('perfil-email').innerText = session.user.email;
         
-        // Saludo header
         const nombreCorto = perfil.nombre ? perfil.nombre.split(' ')[0] : 'Atleta';
         const divSaludo = document.getElementById('header-saludo');
         if (divSaludo) divSaludo.innerText = `¡HOLA, ${nombreCorto.toUpperCase()}! 👋`;
 
-        // Renderizamos el avatar grande en la sección perfil
         const container = document.getElementById('avatar-container-perfil');
         if (container) {
             container.innerHTML = generarHTMLAvatar(perfil.avatar_url, perfil.nombre, 100, 'fs-1');
@@ -107,84 +102,73 @@ async function verificarSesion() {
     cargarRutinaActiva(userId);
 }
 
-// Helper: Generar HTML de Avatar (Foto o Inicial)
 function generarHTMLAvatar(url, nombre, size = 50, fontSizeClass = 'fs-4') {
     if (url) {
-        // Opción A: Tiene Foto (Agregamos timestamp para evitar caché al actualizar)
-        return `<img src="${url}?t=${Date.now()}" 
-                     class="rounded-circle border border-2 border-secondary object-fit-cover" 
-                     style="width: ${size}px; height: ${size}px;">`;
+        return `<img src="${url}?t=${Date.now()}" class="rounded-circle border border-2 border-secondary object-fit-cover" style="width: ${size}px; height: ${size}px;">`;
     } else {
-        // Opción B: No tiene foto -> Inicial
         const inicial = nombre ? nombre.charAt(0).toUpperCase() : '?';
-        return `<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center border border-2 border-dark text-white fw-bold ${fontSizeClass}" 
-                     style="width: ${size}px; height: ${size}px;">
-                    ${inicial}
-                </div>`;
+        return `<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center border border-2 border-dark text-white fw-bold ${fontSizeClass}" style="width: ${size}px; height: ${size}px;">${inicial}</div>`;
     }
 }
 
-// Función para subir avatar a Supabase Storage
 async function subirAvatar(input) {
     if (input.files.length === 0) return;
     const archivo = input.files[0];
-    
-    // UI Loading en el perfil
     const container = document.getElementById('avatar-container-perfil');
     container.innerHTML = `<div class="spinner-border text-warning" style="width: 3rem; height: 3rem;"></div>`;
 
     try {
         const { data: { user } } = await clienteSupabase.auth.getUser();
-        
-        // 1. Subir imagen (Sobrescribimos usando el ID del usuario)
         const ext = archivo.name.split('.').pop();
         const path = `avatar_${user.id}.${ext}`;
 
-        const { error: uploadError } = await clienteSupabase.storage
-            .from('avatars')
-            .upload(path, archivo, { upsert: true });
-
+        const { error: uploadError } = await clienteSupabase.storage.from('avatars').upload(path, archivo, { upsert: true });
         if (uploadError) throw uploadError;
 
-        // 2. Obtener URL Pública
-        const { data: urlData } = clienteSupabase.storage
-            .from('avatars')
-            .getPublicUrl(path);
-
-        const publicUrl = urlData.publicUrl;
-
-        // 3. Guardar URL en tabla perfiles
-        const { error: dbError } = await clienteSupabase
-            .from('perfiles')
-            .update({ avatar_url: publicUrl })
-            .eq('id', user.id);
-
+        const { data: urlData } = clienteSupabase.storage.from('avatars').getPublicUrl(path);
+        const { error: dbError } = await clienteSupabase.from('perfiles').update({ avatar_url: urlData.publicUrl }).eq('id', user.id);
         if (dbError) throw dbError;
 
-        // 4. Actualizar UI
         const nombreActual = document.getElementById('perfil-nombre').innerText;
-        container.innerHTML = generarHTMLAvatar(publicUrl, nombreActual, 100, 'fs-1');
-
+        container.innerHTML = generarHTMLAvatar(urlData.publicUrl, nombreActual, 100, 'fs-1');
         Toast.fire({ icon: 'success', title: 'Foto actualizada' });
 
     } catch (error) {
         console.error(error);
         Toast.fire({ icon: 'error', title: 'Error al subir', text: error.message });
-        verificarSesion(); // Restaurar estado anterior si falla
+        verificarSesion(); 
     }
 }
 
-// Botón Cerrar Sesión con Confirmación
+// LOGICA CAMBIO PASSWORD (MODAL)
+function abrirModalPassword() {
+    document.getElementById('pass-new-1').value = "";
+    document.getElementById('pass-new-2').value = "";
+    new bootstrap.Modal(document.getElementById('modalPassword')).show();
+}
+
+async function guardarPasswordNueva() {
+    const p1 = document.getElementById('pass-new-1').value;
+    const p2 = document.getElementById('pass-new-2').value;
+
+    if (!p1 || p1.length < 6) return Toast.fire({ icon: 'warning', title: 'Muy corta', text: 'Mínimo 6 caracteres.' });
+    if (p1 !== p2) return Toast.fire({ icon: 'error', title: 'Error', text: 'Las contraseñas no coinciden.' });
+
+    const { error } = await clienteSupabase.auth.updateUser({ password: p1 });
+
+    if (error) Toast.fire({ icon: 'error', title: 'Error', text: error.message });
+    else {
+        const el = document.getElementById('modalPassword');
+        const modal = bootstrap.Modal.getInstance(el);
+        if(modal) modal.hide();
+        Swal.fire({ icon: 'success', title: '¡Contraseña Actualizada!', text: 'Tu seguridad ha sido renovada.', background: '#1e2126', color: '#fff', confirmButtonColor: '#ffc107', confirmButtonText: 'Genial' });
+    }
+}
+
 const btnLogout = document.getElementById('btn-logout');
 if (btnLogout) {
     btnLogout.addEventListener('click', async () => {
-        const result = await Popup.fire({
-            title: '¿Ya te vas?',
-            text: "Cerrarás tu sesión actual.",
-            icon: 'question',
-            confirmButtonText: 'Sí, salir'
-        });
-
+        const result = await Popup.fire({ title: '¿Ya te vas?', text: "Cerrarás tu sesión actual.", icon: 'question', confirmButtonText: 'Sí, salir' });
         if (result.isConfirmed) {
             await clienteSupabase.auth.signOut();
             window.location.href = 'login.html';
@@ -194,38 +178,119 @@ if (btnLogout) {
 
 
 // ==========================================
-//      3. CARGA DE RUTINA Y RECURSOS
+//      3. LÓGICA PRINCIPAL (SEMÁFORO DE ACCESO)
 // ==========================================
 
 async function cargarRutinaActiva(userId) {
-    // Si userId no viene (ej. recarga), lo buscamos
     if(!userId) {
         const { data: { user } } = await clienteSupabase.auth.getUser();
         userId = user.id;
     }
 
-    const { data: asignacion, error } = await clienteSupabase
-        .from('asignaciones_rutinas')
-        .select(`rutina_id, rutinas(*), receta:recurso_receta_id ( nombre, archivo_url, tipo ), sugerencia:recurso_sugerencia_id ( nombre, archivo_url, tipo )`)
-        .eq('cliente_id', userId)
-        .eq('activa', true)
-        .single();
+    try {
+        // 1. CHEQUEO DE PAGO
+        const { data: perfil, error: errPerfil } = await clienteSupabase
+            .from('perfiles')
+            .select('fecha_vencimiento_pago')
+            .eq('id', userId)
+            .single();
 
-    if (error || !asignacion) {
-        document.getElementById('contenedor-rutina').innerHTML = `
-            <div class="alert alert-warning text-center mt-5 bg-dark border-warning text-warning">
-                <h4><i class="bi bi-exclamation-triangle"></i></h4>
-                <p>Tu entrenador aún no te ha asignado una rutina.</p>
-            </div>`;
-        document.getElementById('contenedor-botones-dias').innerHTML = "";
-        return;
+        if (errPerfil) throw errPerfil;
+
+        let accesoHabilitado = false;
+        let mensajeAviso = null;
+
+        if (perfil.fecha_vencimiento_pago) {
+            const hoy = new Date();
+            hoy.setHours(0,0,0,0);
+            const vencimiento = new Date(perfil.fecha_vencimiento_pago + 'T00:00:00');
+            
+            const diferenciaMs = vencimiento - hoy;
+            const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+
+            if (diasRestantes > 7) {
+                // VERDE: Todo ok
+                accesoHabilitado = true;
+            } else if (diasRestantes >= 0) {
+                // AMARILLO: Por vencer (0 a 7 días)
+                accesoHabilitado = true;
+                mensajeAviso = `⚠️ Tu plan vence en ${diasRestantes} días. Por favor renueva.`;
+            } else if (diasRestantes >= -7) {
+                // NARANJA: Periodo de Gracia (Venció hace poco)
+                accesoHabilitado = true;
+                mensajeAviso = `🚨 PLAN VENCIDO. Tienes ${7 + diasRestantes} días extra para pagar antes del bloqueo.`;
+            } else {
+                // ROJO: Bloqueado
+                accesoHabilitado = false;
+            }
+        } else {
+            // NUNCA PAGÓ
+            accesoHabilitado = false;
+        }
+
+        // SI NO TIENE ACCESO -> PANEL VENTAS
+        if (!accesoHabilitado) {
+            mostrarPanelVentas();
+            return;
+        }
+
+        // SI HAY AVISO -> TOAST
+        if (mensajeAviso) {
+            Toast.fire({
+                icon: 'warning',
+                title: 'Estado de Cuenta',
+                text: mensajeAviso,
+                timer: 6000
+            });
+        }
+
+        // 2. BUSCAR RUTINA (Si llegó aquí es porque pagó o está en gracia)
+        const { data: asignacion, error } = await clienteSupabase
+            .from('asignaciones_rutinas')
+            .select(`rutina_id, rutinas(*), receta:recurso_receta_id ( nombre, archivo_url, tipo ), sugerencia:recurso_sugerencia_id ( nombre, archivo_url, tipo )`)
+            .eq('cliente_id', userId)
+            .eq('activa', true)
+            .single();
+
+        if (error || !asignacion) {
+            document.getElementById('contenedor-rutina').innerHTML = `
+                <div class="text-center mt-5 px-4 animate__animated animate__fadeIn">
+                    <div class="mb-4"><div class="spinner-grow text-warning" role="status" style="width: 3rem; height: 3rem;"></div></div>
+                    <h3 class="text-white fw-bold">¡Pago Confirmado!</h3>
+                    <p class="text-muted mt-3">Tu entrenador está armando tu plan.</p>
+                </div>`;
+            document.getElementById('titulo-seccion').innerText = "En Espera";
+            document.getElementById('contenedor-botones-dias').innerHTML = "";
+            return;
+        }
+
+        // CARGAR NORMALMENTE
+        const rutina = asignacion.rutinas;
+        document.getElementById('titulo-seccion').innerText = rutina.nombre;
+        cargarRecursosDeAsignacion(asignacion);
+        cargarBotonesDias(rutina.id);
+
+    } catch (e) {
+        console.error(e);
+        document.getElementById('contenedor-rutina').innerHTML = `<div class="alert alert-danger">Error de red</div>`;
     }
+}
 
-    const rutina = asignacion.rutinas;
-    // Actualizamos el título del header con el nombre de la rutina
-    document.getElementById('titulo-seccion').innerText = rutina.nombre;
+function mostrarPanelVentas() {
+    document.getElementById('contenedor-rutina').innerHTML = `
+        <div class="text-center mt-5 px-3 animate__animated animate__fadeIn">
+            <div class="mb-4"><i class="bi bi-activity fs-1 text-secondary opacity-50"></i></div>
+            <h3 class="text-white fw-bold mb-3">¡Bienvenido al Team!</h3>
+            <p class="text-muted mb-4">Actualmente no tienes acceso activo. Contáctame para comenzar.</p>
+            <a href="https://wa.me/${WHATSAPP_ENTRENADOR}?text=Hola,%20me%20registré%20en%20la%20App%20y%20quiero%20más%20info." target="_blank" class="btn btn-success fw-bold w-100 py-3 mb-3 rounded-4 shadow-sm"><i class="bi bi-whatsapp me-2 fs-5"></i>SOLICITAR PLAN AHORA</a>
+            <div class="d-flex align-items-center my-3"><hr class="flex-grow-1 border-secondary opacity-25"><span class="mx-3 text-secondary small">O PRUEBA LA APP</span><hr class="flex-grow-1 border-secondary opacity-25"></div>
+            <button onclick="cargarModoDemo()" class="btn btn-outline-warning fw-bold w-100 py-2 rounded-4 border-dashed"><i class="bi bi-play-circle me-2"></i>VER RUTINA DE EJEMPLO</button>
+        </div>`;
+    document.getElementById('titulo-seccion').innerText = "Bienvenido";
+    document.getElementById('contenedor-botones-dias').innerHTML = "";
+}
 
-    // --- RECURSOS ---
+function cargarRecursosDeAsignacion(asignacion) {
     const contenedorRecursos = document.getElementById('lista-recursos');
     contenedorRecursos.innerHTML = "";
     const recursos = [];
@@ -237,19 +302,12 @@ async function cargarRutinaActiva(userId) {
             const icono = r.tipo === 'receta' ? 'bi-egg-fried' : 'bi-lightbulb';
             const color = r.tipo === 'receta' ? 'text-success' : 'text-warning';
             const border = r.tipo === 'receta' ? 'border-success' : 'border-warning';
-
             contenedorRecursos.innerHTML += `
                 <div class="col-12 col-md-6 animate__animated animate__fadeIn">
-                    <div class="card bg-dark-subtle border-start border-4 ${border} shadow-sm" 
-                         onclick="abrirVisor('${r.archivo_url}', '${r.nombre}')" style="cursor: pointer;">
+                    <div class="card bg-dark-subtle border-start border-4 ${border} shadow-sm" onclick="abrirVisor('${r.archivo_url}', '${r.nombre}')" style="cursor: pointer;">
                         <div class="card-body d-flex align-items-center p-3">
-                            <div class="rounded-circle bg-black d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
-                                <i class="bi ${icono} fs-3 ${color}"></i>
-                            </div>
-                            <div>
-                                <h6 class="text-white mb-0 text-truncate" style="max-width: 200px;">${r.nombre}</h6>
-                                <small class="text-muted">Toque para ver</small>
-                            </div>
+                            <div class="rounded-circle bg-black d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;"><i class="bi ${icono} fs-3 ${color}"></i></div>
+                            <div><h6 class="text-white mb-0 text-truncate" style="max-width: 200px;">${r.nombre}</h6><small class="text-muted">Toque para ver</small></div>
                             <i class="bi bi-chevron-right text-secondary ms-auto"></i>
                         </div>
                     </div>
@@ -258,8 +316,6 @@ async function cargarRutinaActiva(userId) {
     } else {
         contenedorRecursos.innerHTML = '<div class="text-center text-muted mt-5"><i class="bi bi-folder-x fs-1"></i><p>No hay recursos.</p></div>';
     }
-
-    cargarBotonesDias(rutina.id);
 }
 
 async function cargarBotonesDias(rutinaId) {
@@ -272,7 +328,6 @@ async function cargarBotonesDias(rutinaId) {
 
     if (error || dias.length === 0) return;
 
-    // Filtramos días únicos por si acaso
     const diasUnicos = [];
     const numerosVistos = new Set();
     dias.forEach(d => {
@@ -301,13 +356,13 @@ async function cargarBotonesDias(rutinaId) {
 
 
 // ==========================================
-//      4. EJERCICIOS (SKELETON + RENDER CORREGIDO)
+//      4. EJERCICIOS + MODO DEMO
 // ==========================================
 
 async function cargarEjerciciosDelDia(diaId) {
     const contenedor = document.getElementById('contenedor-rutina');
     
-    // 1. MOSTRAR SKELETON (Efecto de carga)
+    // Skeleton Loading
     let skeletonHTML = '';
     for(let i=0; i<3; i++) {
         skeletonHTML += `
@@ -326,7 +381,6 @@ async function cargarEjerciciosDelDia(diaId) {
     }
     contenedor.innerHTML = skeletonHTML;
 
-    // 2. FETCH DATOS REALES
     const { data: ejercicios, error: errorRutina } = await clienteSupabase
         .from('rutinas_detalles')
         .select(`*, ejercicios_catalogo ( nombre, imagen_url )`)
@@ -336,7 +390,6 @@ async function cargarEjerciciosDelDia(diaId) {
 
     if (errorRutina) {
         contenedor.innerHTML = '<div class="alert alert-danger">Error al cargar ejercicios.</div>';
-        Toast.fire({ icon: 'error', title: 'Error de conexión' });
         return;
     }
 
@@ -350,6 +403,25 @@ async function cargarEjerciciosDelDia(diaId) {
         .eq('fecha_entrenamiento', hoy);
 
     renderizarTarjetas(ejercicios, historial || []);
+}
+
+// MODO DEMO
+function cargarModoDemo() {
+    Toast.fire({ icon: 'info', title: 'Modo Demo Activado', text: 'Los datos no se guardarán.' });
+    document.getElementById('titulo-seccion').innerText = "Rutina Demo";
+    
+    const datosDemo = [
+        { id: 'demo_1', ejercicio_id: 999, orden_ejercicio: 1, orden_serie: 1, reps_objetivo: '12', tipo_serie: 'calentamiento', observaciones: 'Barra vacía', ejercicios_catalogo: { nombre: 'Press de Banca', imagen_url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmZpb2I0bnFqb3Fqb3Fqb3Fqb3Fqb3Fqb3Fqb3Fqb3Fqb3FqbyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l41Yh18f5TBiWqe9a/giphy.gif' } },
+        { id: 'demo_2', ejercicio_id: 999, orden_ejercicio: 1, orden_serie: 2, reps_objetivo: '10', tipo_serie: 'trabajo', observaciones: 'Subir peso', ejercicios_catalogo: { nombre: 'Press de Banca', imagen_url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmZpb2I0bnFqb3Fqb3Fqb3Fqb3Fqb3Fqb3Fqb3Fqb3Fqb3FqbyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l41Yh18f5TBiWqe9a/giphy.gif' } },
+        { id: 'demo_3', ejercicio_id: 888, orden_ejercicio: 2, orden_serie: 1, reps_objetivo: '12', tipo_serie: 'trabajo', observaciones: 'Al fallo', ejercicios_catalogo: { nombre: 'Curl con Barra', imagen_url: '' } }
+    ];
+
+    renderizarTarjetas(datosDemo, []);
+    
+    // Botón Salir Demo
+    const btnSalir = document.createElement('div');
+    btnSalir.innerHTML = `<button onclick="location.reload()" class="btn btn-danger btn-sm position-fixed start-50 translate-middle-x shadow-lg rounded-pill px-4" style="bottom: 90px; z-index: 2000;">Salir de la Demo</button>`;
+    document.body.appendChild(btnSalir);
 }
 
 function renderizarTarjetas(datosRutina, datosHistorial) {
@@ -369,7 +441,6 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
         const pesoPrevio = datoGuardado ? datoGuardado.peso_real : '';
         const estaCompletado = datoGuardado && datoGuardado.completado ? 'checked' : '';
 
-        // Header Tarjeta
         const esNuevaTarjeta = fila.orden_ejercicio !== tarjetaActualIdx;
         const nombreEjercicio = fila.ejercicios_catalogo?.nombre || "Ejercicio";
 
@@ -377,23 +448,16 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
             if (tarjetaActualIdx !== null) html += `</div></div>`; 
             tarjetaActualIdx = fila.orden_ejercicio;
 
-            const htmlNotaGeneral = fila.nota_ejercicio 
-                ? `<div class="alert alert-dark border-warning text-warning small mb-3 p-2"><i class="bi bi-info-circle-fill me-2"></i>${fila.nota_ejercicio}</div>` : '';
-
+            const htmlNotaGeneral = fila.nota_ejercicio ? `<div class="alert alert-dark border-warning text-warning small mb-3 p-2"><i class="bi bi-info-circle-fill me-2"></i>${fila.nota_ejercicio}</div>` : '';
             const urlImagen = fila.ejercicios_catalogo?.imagen_url;
-            const htmlImagen = urlImagen
-                ? `<div class="text-center mb-3"><img src="${urlImagen}" class="img-fluid rounded" style="max-height: 200px;" onerror="this.parentElement.style.display='none'"></div>` : '';
+            const htmlImagen = urlImagen ? `<div class="text-center mb-3"><img src="${urlImagen}" class="img-fluid rounded" style="max-height: 200px;" onerror="this.parentElement.style.display='none'"></div>` : '';
 
             html += `
                 <div class="card card-ejercicio p-3 animate__animated animate__fadeIn">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h4 class="m-0 text-white fw-bold" style="max-width: 75%; font-size: 1.1rem;">${nombreEjercicio}</h4>
-                        
                         <div class="d-flex align-items-center gap-2">
-                            <button class="btn btn-sm btn-dark border-secondary text-warning" 
-                                    onclick="abrirGrafico(${fila.ejercicio_id}, '${nombreEjercicio}')">
-                                <i class="bi bi-graph-up"></i>
-                            </button>
+                            <button class="btn btn-sm btn-dark border-secondary text-warning" onclick="abrirGrafico(${fila.ejercicio_id}, '${nombreEjercicio}')"><i class="bi bi-graph-up"></i></button>
                             <span class="badge-numero">#${fila.orden_ejercicio}</span>
                         </div>
                     </div>
@@ -402,12 +466,10 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
                     <div class="lista-series">`;
         }
 
-        // Fila Serie (LAYOUT CORREGIDO: Input + KG Separados)
         const esCalentamiento = fila.tipo_serie === 'calentamiento';
         const badgeColor = esCalentamiento ? 'bg-secondary' : 'bg-success';
         const textoSerie = fila.tipo_serie ? fila.tipo_serie.toUpperCase() : 'TRABAJO';
-        const htmlObservacionFila = fila.observaciones 
-            ? `<div class="text-secondary small fst-italic my-1"><i class="bi bi-caret-right-fill"></i> ${fila.observaciones}</div>` : '';
+        const htmlObservacionFila = fila.observaciones ? `<div class="text-secondary small fst-italic my-1"><i class="bi bi-caret-right-fill"></i> ${fila.observaciones}</div>` : '';
 
         html += `
             <div class="row fila-serie align-items-center">
@@ -416,19 +478,14 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
                     <div class="fw-bold fs-5 text-white">${fila.reps_objetivo} <span class="fs-6 fw-normal text-secondary">reps</span></div>
                     ${htmlObservacionFila}
                 </div>
-                
                 <div class="col-5">
                     <div class="d-flex align-items-center justify-content-end gap-2">
-                        <input type="number" class="form-control input-peso" placeholder="0" value="${pesoPrevio}" 
-                               style="width: 70px;"
-                               onchange="guardarProgreso(${fila.id}, ${fila.ejercicio_id}, 'peso', this.value)">
+                        <input type="number" class="form-control input-peso" placeholder="0" value="${pesoPrevio}" style="width: 70px;" onchange="guardarProgreso(${fila.id === undefined ? `'${fila.id}'` : fila.id}, ${fila.ejercicio_id}, 'peso', this.value)">
                         <span class="badge-kg">kg</span>
                     </div>
                 </div>
-                
                 <div class="col-2 text-end">
-                    <input type="checkbox" class="form-check-input ms-auto"
-                           ${estaCompletado} onchange="guardarProgreso(${fila.id}, ${fila.ejercicio_id}, 'check', this.checked)">
+                    <input type="checkbox" class="form-check-input ms-auto" ${estaCompletado} onchange="guardarProgreso(${fila.id === undefined ? `'${fila.id}'` : fila.id}, ${fila.ejercicio_id}, 'check', this.checked)">
                 </div>
             </div>`;
     });
@@ -437,8 +494,10 @@ function renderizarTarjetas(datosRutina, datosHistorial) {
     contenedor.innerHTML = html;
 }
 
-// Guardar Progreso (Silent Success)
 async function guardarProgreso(detalleId, ejercicioId, tipo, valor) {
+    // Bloqueo demo
+    if (typeof detalleId === 'string' && detalleId.startsWith('demo')) return Toast.fire({ icon: 'info', title: 'Modo Demo', text: 'El progreso no se guarda aquí.' });
+
     const { data: { user } } = await clienteSupabase.auth.getUser();
     const hoy = obtenerFechaLocal();
     const datosUpsert = { usuario_id: user.id, ejercicio_id: ejercicioId, fecha_entrenamiento: hoy };
@@ -452,14 +511,14 @@ async function guardarProgreso(detalleId, ejercicioId, tipo, valor) {
         .upsert(datosUpsert, { onConflict: 'usuario_id, ejercicio_id, fecha_entrenamiento' });
         
     if (error) {
-        console.error("Error guardando:", error);
-        Toast.fire({ icon: 'error', title: 'Error al guardar', text: 'Revisa tu conexión.' });
+        console.error("Error:", error);
+        Toast.fire({ icon: 'error', title: 'No se guardó', text: 'Revisa tu conexión.' });
     }
 }
 
 
 // ==========================================
-//      5. MÓDULO PROGRESO (HISTORIAL)
+//      5. MÓDULO PROGRESO Y GRÁFICOS
 // ==========================================
 
 async function cargarModuloProgreso() {
@@ -489,9 +548,7 @@ async function cargarModuloProgreso() {
             <div class="card bg-dark border-secondary shadow-sm" onclick="abrirGrafico(${id}, '${nombre}')">
                 <div class="card-body py-3 d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3">
-                        <div class="rounded-circle bg-warning d-flex justify-content-center align-items-center" style="width: 40px; height: 40px;">
-                            <i class="bi bi-graph-up-arrow text-black"></i>
-                        </div>
+                        <div class="rounded-circle bg-warning d-flex justify-content-center align-items-center" style="width: 40px; height: 40px;"><i class="bi bi-graph-up-arrow text-black"></i></div>
                         <h6 class="mb-0 text-white">${nombre}</h6>
                     </div>
                     <i class="bi bi-chevron-right text-secondary"></i>
@@ -499,11 +556,6 @@ async function cargarModuloProgreso() {
             </div>`;
     });
 }
-
-
-// ==========================================
-//      6. FUNCIONES MODALES Y CRONÓMETRO
-// ==========================================
 
 function abrirVisor(url, nombre) {
     const modal = new bootstrap.Modal(document.getElementById('modalVisor'));

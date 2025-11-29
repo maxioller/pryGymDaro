@@ -1,154 +1,145 @@
-// js/login.js
+// js/login.js - CON RECUPERACIÓN DE CONTRASEÑA
 
-let esRegistro = false; // Estado inicial: Login
+let modo = 'login'; // 'login', 'registro', 'recuperacion'
 
 const formulario = document.getElementById('form-login');
-// Nota: Ya no necesitamos el elemento 'mensaje-feedback' para mostrar errores, 
-// pero lo dejo declarado por si lo usas en otra cosa, aunque SweetAlert lo reemplaza.
 const mensajeFeedback = document.getElementById('mensaje-feedback');
 
-// Función para cambiar entre Login y Registro
-function alternarModo() {
-    esRegistro = !esRegistro;
-    if(mensajeFeedback) mensajeFeedback.classList.add('d-none'); // Limpiar errores viejos si quedan
+// UI Elements
+const titulo = document.getElementById('titulo-form');
+const subtitulo = document.getElementById('subtitulo-form');
+const campoNombre = document.getElementById('campo-nombre');
+const campoPass = document.querySelector('input[type="password"]').parentElement; // Contenedor del password
+const btnTexto = document.getElementById('btn-texto');
+const textoToggle = document.getElementById('texto-toggle');
+const linkToggle = document.getElementById('link-toggle');
 
-    if (esRegistro) {
-        // MODO REGISTRO
-        document.getElementById('titulo-form').innerText = "Crear Cuenta";
-        document.getElementById('subtitulo-form').innerText = "Únete a nosotros";
-        document.getElementById('campo-nombre').classList.remove('d-none'); // Mostrar nombre
-        document.getElementById('nombre').setAttribute('required', 'true'); // Hacerlo obligatorio
-        document.getElementById('btn-texto').innerText = "REGISTRARSE";
-        
-        document.getElementById('texto-toggle').innerText = "¿Ya tienes cuenta?";
-        document.getElementById('link-toggle').innerText = "Iniciar Sesión";
+// 1. Lógica para cambiar entre modos
+function alternarModo() {
+    // Si estamos en recuperación, volver a login es el comportamiento por defecto del toggle
+    if (modo === 'recuperacion') {
+        modo = 'login';
     } else {
-        // MODO LOGIN
-        document.getElementById('titulo-form').innerText = "Bienvenido";
-        document.getElementById('subtitulo-form').innerText = "Ingresa tus credenciales";
-        document.getElementById('campo-nombre').classList.add('d-none'); // Ocultar nombre
-        document.getElementById('nombre').removeAttribute('required');
-        document.getElementById('btn-texto').innerText = "INGRESAR";
-        
-        document.getElementById('texto-toggle').innerText = "¿No tienes cuenta?";
-        document.getElementById('link-toggle').innerText = "Crear una cuenta";
+        modo = (modo === 'login') ? 'registro' : 'login';
+    }
+    actualizarUI();
+}
+
+function activarRecuperacion() {
+    modo = 'recuperacion';
+    actualizarUI();
+}
+
+function actualizarUI() {
+    // Limpiar errores
+    if(mensajeFeedback) mensajeFeedback.classList.add('d-none');
+    
+    // Resetear campos visuales
+    campoNombre.classList.add('d-none');
+    campoPass.classList.remove('d-none'); // Mostrar pass por defecto
+    document.getElementById('nombre').removeAttribute('required');
+    document.getElementById('password').setAttribute('required', 'true');
+
+    if (modo === 'login') {
+        titulo.innerText = "Bienvenido";
+        subtitulo.innerText = "Ingresa tus credenciales";
+        btnTexto.innerText = "INGRESAR";
+        textoToggle.innerText = "¿No tienes cuenta?";
+        linkToggle.innerText = "Crear una cuenta";
+    } 
+    else if (modo === 'registro') {
+        titulo.innerText = "Crear Cuenta";
+        subtitulo.innerText = "Únete a nosotros";
+        campoNombre.classList.remove('d-none');
+        document.getElementById('nombre').setAttribute('required', 'true');
+        btnTexto.innerText = "REGISTRARSE";
+        textoToggle.innerText = "¿Ya tienes cuenta?";
+        linkToggle.innerText = "Iniciar Sesión";
+    } 
+    else if (modo === 'recuperacion') {
+        titulo.innerText = "Recuperar Cuenta";
+        subtitulo.innerText = "Te enviaremos un enlace mágico";
+        campoPass.classList.add('d-none'); // Ocultar contraseña
+        document.getElementById('password').removeAttribute('required');
+        btnTexto.innerText = "ENVIAR ENLACE";
+        textoToggle.innerText = "¿Ya te acordaste?";
+        linkToggle.innerText = "Volver al Login";
     }
 }
 
+// 2. Manejo del Envío
 formulario.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // UI Loading
-    const btnTexto = document.getElementById('btn-texto');
     const btnSpinner = document.getElementById('btn-spinner');
-    
     btnTexto.classList.add('d-none');
     btnSpinner.classList.remove('d-none');
-    if(mensajeFeedback) mensajeFeedback.classList.add('d-none');
 
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const nombre = document.getElementById('nombre').value;
 
     try {
-        if (esRegistro) {
-            // === LOGICA DE REGISTRO ===
-            const { data, error } = await clienteSupabase.auth.signUp({
-                email: email,
-                password: password,
-                options: {
-                    // Esto es CRUCIAL: Pasamos el nombre para que el Trigger lo capture
-                    data: {
-                        full_name: nombre 
-                    }
-                }
+        if (modo === 'registro') {
+            // --- REGISTRO ---
+            const { error } = await clienteSupabase.auth.signUp({
+                email: email, password: password,
+                options: { data: { full_name: nombre } }
             });
+            if (error) throw error;
+            Toast.fire({ icon: 'success', title: '¡Bienvenido!', text: 'Cuenta creada.' });
+            setTimeout(() => { window.location.href = 'app.html'; }, 1500);
 
+        } else if (modo === 'login') {
+            // --- LOGIN ---
+            const { data, error } = await clienteSupabase.auth.signInWithPassword({
+                email: email, password: password,
+            });
             if (error) throw error;
 
-            // EXITO EN REGISTRO (CON SWEETALERT)
-            Toast.fire({
-                icon: 'success',
-                title: '¡Bienvenido!',
-                text: 'Cuenta creada con éxito. Redirigiendo...'
+            const userId = data.user.id;
+            const { data: perfil } = await clienteSupabase.from('perfiles').select('rol').eq('id', userId).single();
+            
+            Toast.fire({ icon: 'success', title: 'Sesión iniciada' });
+            setTimeout(() => {
+                if (perfil && perfil.rol === 'entrenador') window.location.href = 'admin.html';
+                else window.location.href = 'app.html';
+            }, 1000);
+
+        } else if (modo === 'recuperacion') {
+            // --- RECUPERACIÓN (NUEVO) ---
+            const { error } = await clienteSupabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/app.html' // Redirige a la app
             });
             
-            // Volvemos al modo login automáticamente después de 2 segundos
-            setTimeout(() => {
-                alternarModo();
-                document.getElementById('email').value = email; // Dejamos el email puesto
-                document.getElementById('password').value = "";
-            }, 2000);
-
-        } else {
-            // === LOGICA DE LOGIN ===
-            const { data, error } = await clienteSupabase.auth.signInWithPassword({
-                email: email,
-                password: password,
-            });
-
             if (error) throw error;
 
-            // Verificar Rol y Redirigir
-            const userId = data.user.id;
-            const { data: perfil, error: errorPerfil } = await clienteSupabase
-                .from('perfiles')
-                .select('rol')
-                .eq('id', userId)
-                .single();
-
-            if (errorPerfil) throw errorPerfil;
-
-            // Toast opcional de bienvenida al loguearse
-            Toast.fire({
+            await Swal.fire({
                 icon: 'success',
-                title: 'Sesión iniciada'
+                title: 'Correo enviado',
+                text: 'Revisa tu bandeja de entrada (y spam). Encontrarás un enlace para entrar y cambiar tu contraseña.',
+                background: '#1e2126', color: '#fff', confirmButtonColor: '#ffc107', confirmButtonText: 'Entendido'
             });
-
-            // Pequeña demora para que se vea el Toast antes de cambiar de página
-            setTimeout(() => {
-                if (perfil.rol === 'entrenador') {
-                    window.location.href = 'admin.html';
-                } else {
-                    window.location.href = 'app.html';
-                }
-            }, 1000);
+            
+            // Volver a login
+            modo = 'login';
+            actualizarUI();
         }
 
     } catch (error) {
         console.error(error);
-        
-        // ERROR GENERAL (CON SWEETALERT)
-        Toast.fire({
-            icon: 'error',
-            title: 'Ups, algo falló',
-            text: error.message || "Ocurrió un error inesperado."
-        });
-
+        Toast.fire({ icon: 'error', title: 'Error', text: error.message || "Ocurrió un error." });
     } finally {
-        // Restaurar botones
         btnTexto.classList.remove('d-none');
         btnSpinner.classList.add('d-none');
     }
 });
 
-// Función para iniciar sesión con Google
+// Google Login
 async function loginConGoogle() {
-    const { data, error } = await clienteSupabase.auth.signInWithOAuth({
+    const { error } = await clienteSupabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-            redirectTo: window.location.origin + '/app.html' 
-        }
+        options: { redirectTo: window.location.origin + '/app.html' }
     });
-
-    if (error) {
-        console.error("Error Google:", error);
-        
-        // ERROR GOOGLE (CON SWEETALERT)
-        Toast.fire({
-            icon: 'error',
-            title: 'Error de acceso',
-            text: error.message || 'No se pudo conectar con Google'
-        });
-    }
+    if (error) Toast.fire({ icon: 'error', title: 'Error Google', text: error.message });
 }
